@@ -2,10 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Asset, Channel, ContentItem, Format, Pillar } from "@/lib/types";
-import { AssetPicker } from "@/components/AssetPicker";
 import { ChannelMultiSelect } from "@/components/ChannelMultiSelect";
-import { blueprintBySlug, weeklyFlow } from "@/lib/content-framework";
-import { formatArtworkBySlug } from "@/lib/inspiration";
 
 // Which pillar slugs are relevant per brand
 const PILLAR_BRAND_SLUGS: Record<"seb" | "ublend", string[]> = {
@@ -71,18 +68,13 @@ export function ContentForm({
       ? linkedChannelIds
       : formatChannelDefaults(formatLookup.get(initialFormatId), channels),
   );
-  const [selectedAssets, setSelectedAssets] = useState<number[]>(linkedAssetIds);
   // Only show pillars that belong to the selected brand
   const visiblePillars = useMemo(
     () => pillars.filter((p) => PILLAR_BRAND_SLUGS[brand].includes(p.slug)),
     [pillars, brand],
   );
 
-  const selectedFormat = formatLookup.get(formatId);
-  const selectedBlueprint = selectedFormat ? blueprintBySlug[selectedFormat.slug] : undefined;
-  const selectedArtwork = selectedFormat ? formatArtworkBySlug[selectedFormat.slug] : undefined;
   const selectedChannelObjects = channels.filter((channel) => selectedChannels.includes(channel.id));
-  const selectedAssetObjects = assets.filter((asset) => selectedAssets.includes(asset.id));
 
   const applyFormat = (nextFormatId: number) => {
     const nextFormat = formatLookup.get(nextFormatId);
@@ -118,353 +110,147 @@ export function ContentForm({
     );
   };
 
-  const toggleAsset = (assetId: number) => {
-    setSelectedAssets((current) =>
-      current.includes(assetId) ? current.filter((id) => id !== assetId) : [...current, assetId],
-    );
-  };
-
   return (
     <form action={action} className="space-y-6">
       {item?.id ? <input type="hidden" name="id" value={item.id} /> : null}
-      <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-        <div className="space-y-6">
-          <section className="app-card space-y-6 p-6 sm:p-7">
-            <div className="flex flex-wrap gap-2">
-              <span className="chip active">{item?.id ? "Draft workspace" : "New draft"}</span>
-              {selectedBlueprint ? <span className="chip">{selectedBlueprint.weeklySlot}</span> : null}
-            </div>
 
-            <div className="space-y-3">
-              <label htmlFor="title">Working title</label>
-              <input
-                id="title"
-                name="title"
-                defaultValue={item?.title ?? ""}
-                placeholder="What is this post really about?"
-                required
-              />
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div>
-                <label htmlFor="format_id">Format</label>
-                <select
-                  id="format_id"
-                  name="format_id"
-                  value={formatId}
-                  onChange={(event) => applyFormat(Number(event.target.value))}
-                >
-                  {formats.map((format) => (
-                    <option key={format.id} value={format.id}>
-                      {format.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="pillar_id">Pillar</label>
-                <select
-                  id="pillar_id"
-                  name="pillar_id"
-                  value={pillarId}
-                  onChange={(e) => setPillarId(Number(e.target.value))}
-                >
-                  {visiblePillars.map((pillar) => (
-                    <option key={pillar.id} value={pillar.id}>
-                      {pillar.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="target_post_at">Target post at</label>
-                <input
-                  id="target_post_at"
-                  name="target_post_at"
-                  type="datetime-local"
-                  defaultValue={initialTargetPostAt ?? item?.target_post_at?.slice(0, 16) ?? ""}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label>Brand</label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {(["seb", "ublend"] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => handleBrandChange(option)}
-                    className={`soft-card min-h-[56px] px-4 py-3 text-left ${
-                      brand === option ? "border-[var(--brand)] bg-white/95" : ""
-                    }`}
-                  >
-                    <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                      Brand
-                    </div>
-                    <div className="mt-1 text-lg font-semibold tracking-[-0.03em] text-[var(--brand)]">
-                      {option === "seb" ? "Seb" : "uBlend"}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <input type="hidden" name="brand" value={brand} />
-            </div>
-
-            <div>
-              <label>Distribution channels</label>
-              <ChannelMultiSelect
-                channels={channels}
-                selectedIds={selectedChannels}
-                brand={brand}
-                onToggle={toggleChannel}
-              />
-              <div className="mt-3 flex flex-wrap gap-2">
-                {selectedChannelObjects.map((channel) => (
-                  <span key={channel.id} className="chip">
-                    {channel.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="app-card space-y-5 p-6 sm:p-7">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div className="eyebrow">Writing space</div>
-                <h3 className="mt-3 text-[2rem] font-semibold tracking-[-0.05em] text-[var(--brand)]">
-                  Draft the post with room to think
-                </h3>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--ink-soft)]">
-                  Keep the structure visible, then write cleanly. The chosen format only fills empty fields so your
-                  edits stay yours.
-                </p>
-              </div>
-              {selectedBlueprint ? <span className="chip">{selectedBlueprint.purpose}</span> : null}
-            </div>
-
-            <div className="grid gap-5">
-              <div>
-                <label htmlFor="hook">Hook</label>
-                <textarea
-                  id="hook"
-                  name="hook"
-                  value={hook}
-                  onChange={(event) => setHook(event.target.value)}
-                  className="min-h-[140px]"
-                />
-              </div>
-              <div>
-                <label htmlFor="body">Body</label>
-                <textarea
-                  id="body"
-                  name="body"
-                  value={body}
-                  onChange={(event) => setBody(event.target.value)}
-                  className="min-h-[280px]"
-                />
-              </div>
-              <div>
-                <label htmlFor="close">Close</label>
-                <textarea
-                  id="close"
-                  name="close"
-                  value={close}
-                  onChange={(event) => setClose(event.target.value)}
-                  className="min-h-[140px]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="notes">Notes</label>
-              <textarea
-                id="notes"
-                name="notes"
-                defaultValue={item?.notes ?? ""}
-                className="min-h-[160px]"
-                placeholder="Angle, audience, proof point, or edit note..."
-              />
-            </div>
-
-            <button type="submit" className="primary-button">
-              Save content
-            </button>
-          </section>
+      <section className="app-card space-y-6 p-6 sm:p-7">
+        <div className="space-y-3">
+          <label htmlFor="title">Title</label>
+          <input
+            id="title"
+            name="title"
+            defaultValue={item?.title ?? ""}
+            placeholder="What is this post about?"
+            required
+          />
         </div>
 
-        <div className="space-y-6">
-          {selectedBlueprint ? (
-            <section className="app-card space-y-5 p-6">
-              <div className="eyebrow">Format blueprint</div>
-              <div>
-                <h3 className="text-[2rem] font-semibold tracking-[-0.05em] text-[var(--brand)]">
-                  {selectedBlueprint.name}
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-                  {selectedBlueprint.purpose}
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="soft-card p-4">
-                  <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                    Best for
-                  </div>
-                  <div className="mt-2 text-sm leading-7 text-[var(--ink)]">
-                    {selectedBlueprint.bestFor.join(" • ")}
-                  </div>
-                </div>
-                <div className="soft-card p-4">
-                  <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                    Format / effort
-                  </div>
-                  <div className="mt-2 text-sm leading-7 text-[var(--ink)]">
-                    {selectedBlueprint.format} • {selectedBlueprint.time} • {selectedBlueprint.effort}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-3">
-                <div className="soft-card p-4">
-                  <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                    Voice
-                  </div>
-                  <div className="mt-2 text-sm leading-7 text-[var(--ink)]">{selectedBlueprint.voice}</div>
-                </div>
-                <div className="soft-card p-4">
-                  <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                    Proof to include
-                  </div>
-                  <div className="mt-2 text-sm leading-7 text-[var(--ink)]">{selectedBlueprint.proofPrompt}</div>
-                </div>
-                <div className="soft-card p-4 studio-accent-card">
-                  <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                    Creative cue
-                  </div>
-                  <div className="mt-2 text-sm leading-7 text-[var(--ink)]">{selectedBlueprint.creativeCue}</div>
-                </div>
-              </div>
-
-              <div className="rounded-[24px] border border-[var(--line)] bg-white/55 p-5">
-                <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                  Structure
-                </div>
-                <div className="mt-4 space-y-4 text-sm leading-7 text-[var(--ink)]">
-                  <div>
-                    <div className="font-semibold text-[var(--brand)]">Hook</div>
-                    <div>{selectedBlueprint.structure.hook}</div>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-[var(--brand)]">Body</div>
-                    <div>{selectedBlueprint.structure.body}</div>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-[var(--brand)]">Close</div>
-                    <div>{selectedBlueprint.structure.close}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[24px] border border-[var(--line)] bg-white/55 p-5">
-                <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                  Capture sources
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedBlueprint.captureSources.map((source) => (
-                    <span key={source} className="chip">
-                      {source}
-                    </span>
-                  ))}
-                </div>
-                <div className="mt-5 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                  Example angles
-                </div>
-                <div className="mt-3 space-y-3 text-sm leading-7 text-[var(--ink-soft)]">
-                  {selectedBlueprint.examples.map((example) => (
-                    <div key={example} className="rounded-[20px] border border-[var(--line)] bg-white/55 px-4 py-3">
-                      {example}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {selectedArtwork ? (
-                <div className="soft-card overflow-hidden">
-                  <div
-                    className="aspect-[5/4] bg-cover bg-center"
-                    style={{ backgroundImage: `url(${selectedArtwork.src})` }}
-                  />
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-
-          <section className="app-card space-y-5 p-6">
-            <div className="eyebrow">Attached assets</div>
-            <div>
-              <h3 className="text-[2rem] font-semibold tracking-[-0.05em] text-[var(--brand)]">
-                Draft from one calm asset space
-              </h3>
-              <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-                Link the clips and photos you actually need for this post. One asset can support multiple drafts.
-              </p>
-            </div>
-
-            {selectedAssetObjects.length ? (
-              <div className="space-y-3">
-                {selectedAssetObjects.map((asset) => (
-                  <div key={asset.id} className="soft-card flex items-center justify-between gap-3 px-4 py-3">
-                    <div>
-                      <div className="font-semibold text-[var(--brand)]">{asset.title}</div>
-                      <div className="text-sm text-[var(--ink-soft)]">
-                        {asset.captured_on ?? "No capture date"} • {asset.kind.replaceAll("_", " ")}
-                      </div>
-                    </div>
-                    <span className="chip">Attached</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-[22px] border border-dashed border-[var(--line)] bg-white/35 p-4 text-sm leading-7 text-[var(--ink-soft)]">
-                No assets linked yet. Pick only the clips or photos that actually help you write this post clearly.
-              </div>
-            )}
-
-            <AssetPicker
-              assets={assets}
-              selectedAssetIds={selectedAssets}
-              onToggle={toggleAsset}
-            />
-          </section>
-
-          <section className="app-card p-6">
-            <div className="eyebrow">Weekly operating system</div>
-            <h3 className="mt-3 text-[2rem] font-semibold tracking-[-0.05em] text-[var(--brand)]">
-              Where this draft fits
-            </h3>
-            <div className="mt-5 space-y-3">
-              {weeklyFlow.map((item) => (
-                <div key={item.day} className="rounded-[22px] border border-[var(--line)] bg-white/55 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                        {item.day}
-                      </div>
-                      <div className="mt-1 font-semibold tracking-[-0.02em] text-[var(--brand)]">
-                        {item.title}
-                      </div>
-                    </div>
-                    <span className="chip">{item.output}</span>
-                  </div>
-                </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label htmlFor="format_id">Format</label>
+            <select
+              id="format_id"
+              name="format_id"
+              value={formatId}
+              onChange={(e) => applyFormat(Number(e.target.value))}
+            >
+              {formats.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="pillar_id">Pillar</label>
+            <select
+              id="pillar_id"
+              name="pillar_id"
+              value={pillarId}
+              onChange={(e) => setPillarId(Number(e.target.value))}
+            >
+              {visiblePillars.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label>Brand</label>
+            <div className="flex gap-2 mt-1">
+              {(["seb", "ublend"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => handleBrandChange(option)}
+                  className={`flex-1 rounded-full border px-4 py-2.5 text-sm font-semibold ${
+                    brand === option
+                      ? "border-[var(--brand)] bg-[var(--brand)] text-white"
+                      : "border-[var(--line)] text-[var(--ink)] hover:border-[var(--brand)]"
+                  }`}
+                >
+                  {option === "seb" ? "Seb" : "uBlend"}
+                </button>
               ))}
             </div>
-          </section>
+            <input type="hidden" name="brand" value={brand} />
+          </div>
+          <div>
+            <label htmlFor="target_post_at">Target date</label>
+            <input
+              id="target_post_at"
+              name="target_post_at"
+              type="datetime-local"
+              defaultValue={initialTargetPostAt ?? item?.target_post_at?.slice(0, 16) ?? ""}
+            />
+          </div>
         </div>
-      </div>
+
+        <div>
+          <label>Channels</label>
+          <ChannelMultiSelect
+            channels={channels}
+            selectedIds={selectedChannels}
+            brand={brand}
+            onToggle={toggleChannel}
+          />
+          {selectedChannelObjects.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedChannelObjects.map((ch) => (
+                <span key={ch.id} className="chip">{ch.name}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="app-card space-y-5 p-6 sm:p-7">
+        <h2 className="sub-title">Write the post</h2>
+        <div>
+          <label htmlFor="hook">Hook</label>
+          <textarea
+            id="hook"
+            name="hook"
+            value={hook}
+            onChange={(e) => setHook(e.target.value)}
+            className="min-h-[120px]"
+            placeholder="Opening line that stops the scroll"
+          />
+        </div>
+        <div>
+          <label htmlFor="body">Body</label>
+          <textarea
+            id="body"
+            name="body"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            className="min-h-[240px]"
+            placeholder="The substance of the post"
+          />
+        </div>
+        <div>
+          <label htmlFor="close">Close</label>
+          <textarea
+            id="close"
+            name="close"
+            value={close}
+            onChange={(e) => setClose(e.target.value)}
+            className="min-h-[120px]"
+            placeholder="Call to action or final thought"
+          />
+        </div>
+        <div>
+          <label htmlFor="notes">Notes</label>
+          <textarea
+            id="notes"
+            name="notes"
+            defaultValue={item?.notes ?? ""}
+            className="min-h-[80px]"
+            placeholder="Angle, audience, proof point, or edit note..."
+          />
+        </div>
+        <button type="submit" className="primary-button">
+          Save content
+        </button>
+      </section>
     </form>
   );
 }

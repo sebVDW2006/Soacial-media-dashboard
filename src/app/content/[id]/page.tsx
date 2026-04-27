@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import { ContentForm } from "@/components/ContentForm";
-import { PaintingFeature } from "@/components/PaintingFeature";
-import { addKpi, markPosted, saveChannelSchedule, upsertContent } from "@/app/content/actions";
-import { featuredInspiration } from "@/lib/inspiration";
+import { addKpi, deleteContent, markPosted, saveChannelSchedule, upsertContent } from "@/app/content/actions";
 import { getAssets, getContentById, getReferenceData } from "@/lib/queries";
 import { formatDateTimeLocal } from "@/lib/week";
 
@@ -14,38 +12,35 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
   const { id } = await params;
   const contentId = Number(id);
 
-  if (!Number.isFinite(contentId)) {
-    notFound();
-  }
+  if (!Number.isFinite(contentId)) notFound();
 
   const detail = await getContentById(contentId);
-
-  if (!detail) {
-    notFound();
-  }
+  if (!detail) notFound();
 
   const { formats, pillars, channels } = await getReferenceData();
   const assets = await getAssets();
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-8 2xl:grid-cols-[1.15fr_0.95fr]">
-        <div className="app-card p-8 sm:p-10 lg:p-12">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 2</p>
-          <h1 className="section-title mt-2">{detail.item.title}</h1>
-          <p className="muted mt-4 max-w-2xl leading-8">
-            Edit the piece, then handle scheduling, posting, and KPI capture from the same page.
-          </p>
+      <section className="app-card p-7 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="section-title">{detail.item.title}</h1>
+            <p className="muted mt-2 text-sm">Edit the piece, schedule it, and log KPIs from this page.</p>
+          </div>
+          <form action={deleteContent}>
+            <input type="hidden" name="id" value={detail.item.id} />
+            <button
+              type="submit"
+              className="secondary-button"
+              onClick={(e) => {
+                if (!confirm("Delete this piece? This cannot be undone.")) e.preventDefault();
+              }}
+            >
+              Delete piece
+            </button>
+          </form>
         </div>
-
-        <PaintingFeature
-          artwork={featuredInspiration.content}
-          eyebrow="Page atmosphere"
-          title="Refine the piece without losing the mood."
-          copy="The editor should feel composed and serious: one source piece, clear choices, and enough atmosphere to keep the work expressive."
-          heightClass="min-h-[380px]"
-          align="top"
-        />
       </section>
 
       <ContentForm
@@ -59,35 +54,33 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
         assets={assets}
       />
 
-      <section className="app-card space-y-5 p-5">
+      <section className="app-card space-y-5 p-6 sm:p-7">
         <div>
-          <h2 className="sub-title">Per-channel scheduling</h2>
+          <h2 className="sub-title">Schedule and post</h2>
           <p className="muted mt-2 text-sm">
-            Schedule, post, and track each distribution stream independently.
+            Set the date, mark it posted, and log KPIs per channel once it is live.
           </p>
         </div>
+
         {detail.channels.length ? (
           detail.channels.map((channel) => (
-            <div key={channel.id} className="soft-card space-y-4 p-4">
+            <div key={channel.id} className="soft-card space-y-5 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-bold">{channel.channel_name}</h3>
-                  <p className="text-sm text-stone-500">{channel.brand}</p>
-                </div>
+                <h3 className="text-lg font-bold">{channel.channel_name}</h3>
                 <form action={markPosted}>
                   <input type="hidden" name="content_channel_id" value={channel.id} />
                   <input type="hidden" name="content_item_id" value={detail.item.id} />
-                  <button type="submit" className="secondary-button">
+                  <button type="submit" className="primary-button">
                     Mark posted
                   </button>
                 </form>
               </div>
 
-              <form action={saveChannelSchedule} className="grid gap-4 xl:grid-cols-4">
+              <form action={saveChannelSchedule} className="grid gap-4 sm:grid-cols-3">
                 <input type="hidden" name="content_channel_id" value={channel.id} />
                 <input type="hidden" name="content_item_id" value={detail.item.id} />
                 <div>
-                  <label>Scheduled at</label>
+                  <label>Scheduled date</label>
                   <input
                     name="scheduled_at"
                     type="datetime-local"
@@ -95,7 +88,7 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
                   />
                 </div>
                 <div>
-                  <label>Posted at</label>
+                  <label>Posted date</label>
                   <input
                     name="posted_at"
                     type="datetime-local"
@@ -103,26 +96,22 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
                   />
                 </div>
                 <div>
-                  <label>Posted URL</label>
-                  <input name="posted_url" defaultValue={channel.posted_url ?? ""} />
+                  <label>Post URL</label>
+                  <input name="posted_url" defaultValue={channel.posted_url ?? ""} placeholder="https://..." />
                 </div>
-                <div className="flex items-end">
-                  <button type="submit" className="secondary-button w-full">
+                <div className="sm:col-span-3">
+                  <button type="submit" className="secondary-button">
                     Save schedule
                   </button>
                 </div>
               </form>
 
-              <form action={addKpi} className="grid gap-3 xl:grid-cols-6">
+              <form action={addKpi} className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 <input type="hidden" name="content_channel_id" value={channel.id} />
                 <input type="hidden" name="content_item_id" value={detail.item.id} />
                 <div>
                   <label>Impressions</label>
                   <input name="impressions" type="number" min="0" defaultValue="0" />
-                </div>
-                <div>
-                  <label>Views</label>
-                  <input name="views" type="number" min="0" defaultValue="0" />
                 </div>
                 <div>
                   <label>Likes</label>
@@ -137,39 +126,23 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
                   <input name="shares" type="number" min="0" defaultValue="0" />
                 </div>
                 <div>
-                  <label>Saves</label>
-                  <input name="saves" type="number" min="0" defaultValue="0" />
-                </div>
-                <div>
-                  <label>Profile visits</label>
-                  <input name="profile_visits" type="number" min="0" defaultValue="0" />
-                </div>
-                <div>
                   <label>Follows</label>
                   <input name="follows" type="number" min="0" defaultValue="0" />
-                </div>
-                <div>
-                  <label>Link clicks</label>
-                  <input name="link_clicks" type="number" min="0" defaultValue="0" />
                 </div>
                 <div>
                   <label>DMs / leads</label>
                   <input name="dms_or_leads" type="number" min="0" defaultValue="0" />
                 </div>
-                <div className="xl:col-span-2">
-                  <label>Notes</label>
-                  <input name="notes" />
-                </div>
-                <div className="xl:col-span-6">
+                <div className="sm:col-span-3 lg:col-span-6">
                   <button type="submit" className="primary-button">
-                    Add KPI snapshot
+                    Save KPIs
                   </button>
                 </div>
               </form>
             </div>
           ))
         ) : (
-          <p className="muted text-sm">Choose at least one channel above to unlock scheduling and KPI tracking.</p>
+          <p className="muted text-sm">Add at least one channel above to unlock scheduling and KPIs.</p>
         )}
       </section>
     </div>

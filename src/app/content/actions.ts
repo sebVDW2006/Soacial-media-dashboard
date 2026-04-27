@@ -175,6 +175,20 @@ export async function markPosted(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function deleteContent(formData: FormData) {
+  const id = parseNullableInteger(formData.get("id"));
+  if (!id) throw new Error("Content ID required.");
+
+  const db = await getDb();
+  await db.execute({ sql: "DELETE FROM content_items WHERE id = ?", args: [id] });
+
+  revalidatePath("/content");
+  revalidatePath("/pipeline");
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  redirect("/content");
+}
+
 export async function addKpi(formData: FormData) {
   const contentChannelId = parseNullableInteger(formData.get("content_channel_id"));
   const contentItemId = parseNullableInteger(formData.get("content_item_id"));

@@ -15,8 +15,6 @@ const utilityLinks = [
   ["/inbox", "Inbox"],
   ["/capture", "Capture day"],
   ["/assets", "Assets"],
-  ["/formats", "Formats"],
-  ["/reviews", "Reviews"],
   ["/settings", "Settings"],
 ];
 
@@ -52,22 +50,11 @@ export function Nav() {
     <nav className="top-nav">
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-6 py-5 lg:px-10">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="space-y-2">
-            <Link href="/" className="text-[2rem] font-semibold tracking-[-0.08em] text-[var(--brand)]">
-              Content OS
-            </Link>
-            <p className="max-w-xl text-sm leading-7 text-[var(--ink-soft)]">
-              Seb x uBlend creative operating system. Capture source material, shape it into formats, and publish with
-              intention.
-            </p>
-          </div>
+          <Link href="/" className="text-[2rem] font-semibold tracking-[-0.08em] text-[var(--brand)]">
+            Content OS
+          </Link>
 
-          <div className="flex flex-col gap-3 xl:items-end">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="chip">Creative system</span>
-              <span className="chip">Tuesday-led workflow</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-3 rounded-full border border-[var(--line)] bg-white/70 p-2 shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 rounded-full border border-[var(--line)] bg-white/70 p-2 shadow-sm">
               {(["all", "seb", "ublend"] as const).map((option) => (
                 <Link
                   key={option}
@@ -82,7 +69,6 @@ export function Nav() {
                 </Link>
               ))}
             </div>
-          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 rounded-[34px] border border-[var(--line)] bg-white/70 p-2 shadow-sm">
@@ -105,18 +91,15 @@ export function Nav() {
           })}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-4">
           {utilityLinks.map(([href, label]) => {
             const active = isActive(pathname, href);
-
             return (
               <Link
                 key={href}
                 href={buildSectionUrl(href, brand)}
-                className={`rounded-full border px-4 py-2.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] whitespace-nowrap ${
-                  active
-                    ? "border-[var(--brand)] bg-[var(--brand)] text-white"
-                    : "border-[var(--line)] bg-white/60 text-[var(--ink)] hover:border-[var(--brand)] hover:text-[var(--brand)]"
+                className={`text-[0.68rem] font-semibold uppercase tracking-[0.14em] whitespace-nowrap ${
+                  active ? "text-[var(--brand)]" : "text-[var(--ink-soft)] hover:text-[var(--brand)]"
                 }`}
               >
                 {label}
