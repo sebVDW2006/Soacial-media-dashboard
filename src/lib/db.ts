@@ -1,6 +1,7 @@
 import { createClient, type Client } from "@libsql/client";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { seedReferenceData } from "@/lib/seed";
 
 let clientInstance: Client | null = null;
 let initPromise: Promise<Client> | null = null;
@@ -37,6 +38,22 @@ async function ensureSchema(client: Client) {
   }
 }
 
+async function ensureReferenceData(client: Client) {
+  const checks = await Promise.all([
+    client.execute("SELECT COUNT(*) AS count FROM pillars"),
+    client.execute("SELECT COUNT(*) AS count FROM formats"),
+    client.execute("SELECT COUNT(*) AS count FROM channels"),
+  ]);
+
+  const [pillarCount, formatCount, channelCount] = checks.map((result) =>
+    Number(result.rows[0]?.count ?? 0),
+  );
+
+  if (pillarCount === 0 || formatCount === 0 || channelCount === 0) {
+    await seedReferenceData(client);
+  }
+}
+
 export async function getDb() {
   if (clientInstance && initPromise) {
     return initPromise;
@@ -50,7 +67,9 @@ export async function getDb() {
   }
 
   if (!initPromise) {
-    initPromise = ensureSchema(clientInstance).then(() => clientInstance as Client);
+    initPromise = ensureSchema(clientInstance)
+      .then(() => ensureReferenceData(clientInstance as Client))
+      .then(() => clientInstance as Client);
   }
 
   return initPromise;
