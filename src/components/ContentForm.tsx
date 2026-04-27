@@ -5,6 +5,7 @@ import type { Asset, Channel, ContentItem, Format, Pillar } from "@/lib/types";
 import { AssetPicker } from "@/components/AssetPicker";
 import { ChannelMultiSelect } from "@/components/ChannelMultiSelect";
 import { blueprintBySlug, weeklyFlow } from "@/lib/content-framework";
+import { formatArtworkBySlug } from "@/lib/inspiration";
 
 const defaultChannelMap: Record<string, string[]> = {
   "founder-lesson": ["seb_linkedin", "seb_instagram", "youtube_shorts"],
@@ -66,6 +67,7 @@ export function ContentForm({
   const [selectedAssets, setSelectedAssets] = useState<number[]>(linkedAssetIds);
   const selectedFormat = formatLookup.get(formatId);
   const selectedBlueprint = selectedFormat ? blueprintBySlug[selectedFormat.slug] : undefined;
+  const selectedArtwork = selectedFormat ? formatArtworkBySlug[selectedFormat.slug] : undefined;
   const selectedChannelObjects = channels.filter((channel) => selectedChannels.includes(channel.id));
   const selectedAssetObjects = assets.filter((asset) => selectedAssets.includes(asset.id));
 
@@ -338,6 +340,26 @@ export function ContentForm({
                   ))}
                 </div>
               </div>
+
+              {selectedArtwork ? (
+                <div className="soft-card overflow-hidden">
+                  <div
+                    className="aspect-[5/4] bg-cover bg-center"
+                    style={{ backgroundImage: `url(${selectedArtwork.src})` }}
+                  />
+                  <div className="space-y-2 p-5">
+                    <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
+                      Format mood
+                    </div>
+                    <p className="text-xl font-semibold tracking-[-0.03em] text-[var(--brand)]">
+                      {selectedArtwork.title}
+                    </p>
+                    <p className="text-sm leading-7 text-[var(--ink-soft)]">
+                      {selectedArtwork.artist} • {selectedArtwork.mood}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
             </section>
           ) : null}
 

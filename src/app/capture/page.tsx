@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { CaptureChecklist } from "@/components/CaptureChecklist";
+import { PaintingFeature } from "@/components/PaintingFeature";
 import { addAsset, completeSession } from "@/app/capture/actions";
 import { weeklyFlow } from "@/lib/content-framework";
+import { featuredInspiration, inspirationArtworks } from "@/lib/inspiration";
 import { getAssets, getOrCreateCurrentCaptureSession } from "@/lib/queries";
 
 export default async function CapturePage() {
@@ -10,7 +12,7 @@ export default async function CapturePage() {
 
   return (
     <div className="space-y-10">
-      <section className="grid gap-8 2xl:grid-cols-[1.75fr_1fr]">
+      <section className="grid gap-8 2xl:grid-cols-[1.45fr_1fr]">
         <div className="app-card p-8 sm:p-10 lg:p-12">
           <div className="flex flex-wrap gap-2">
             <span className="chip active">Tuesday capture day</span>
@@ -60,26 +62,52 @@ export default async function CapturePage() {
           </div>
         </div>
 
-        <div className="app-card p-8 sm:p-9">
-          <div className="eyebrow">Weekly flow</div>
-          <h2 className="mt-3 text-[2rem] font-semibold tracking-[-0.05em] text-[var(--brand)]">
-            Tuesday creates the week
-          </h2>
-          <div className="mt-6 space-y-5">
-            {weeklyFlow.map((item) => (
-              <div key={item.day} className="rounded-[26px] border border-[var(--line)] bg-white/55 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                      {item.day}
+        <div className="space-y-6">
+          <PaintingFeature
+            artwork={featuredInspiration.capture}
+            eyebrow="Creative atmosphere"
+            title="Capture in a field of ideas."
+            copy="Let the visual atmosphere stay expansive while the system stays practical. The page should feel like collecting source material for something meaningful."
+            heightClass="min-h-[320px]"
+            align="top"
+          />
+
+          <div className="app-card p-8 sm:p-9">
+            <div className="eyebrow">Weekly flow</div>
+            <h2 className="mt-3 text-[2rem] font-semibold tracking-[-0.05em] text-[var(--brand)]">
+              Tuesday creates the week
+            </h2>
+            <div className="mt-6 space-y-5">
+              {weeklyFlow.map((item) => (
+                <div key={item.day} className="rounded-[26px] border border-[var(--line)] bg-white/55 p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
+                        {item.day}
+                      </div>
+                      <div className="mt-1 text-lg font-semibold tracking-[-0.03em] text-[var(--brand)]">
+                        {item.title}
+                      </div>
                     </div>
-                    <div className="mt-1 text-lg font-semibold tracking-[-0.03em] text-[var(--brand)]">
-                      {item.title}
-                    </div>
+                    <span className="chip">{item.output}</span>
                   </div>
-                  <span className="chip">{item.output}</span>
+                  <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">{item.detail}</p>
                 </div>
-                <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">{item.detail}</p>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {[inspirationArtworks[0], inspirationArtworks[2], inspirationArtworks[5]].map((artwork) => (
+              <div key={artwork.src} className="soft-card overflow-hidden">
+                <div
+                  className="aspect-[4/5] bg-cover bg-center"
+                  style={{ backgroundImage: `url(${artwork.src})` }}
+                />
+                <div className="space-y-1 p-4">
+                  <p className="font-semibold tracking-[-0.03em] text-[var(--brand)]">{artwork.title}</p>
+                  <p className="text-sm text-[var(--ink-soft)]">{artwork.mood}</p>
+                </div>
               </div>
             ))}
           </div>
