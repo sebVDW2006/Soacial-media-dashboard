@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { deleteContent } from "@/app/content/actions";
+import { DeleteButton } from "@/components/DeleteButton";
 import { getContentItems } from "@/lib/queries";
 import type { ContentStatus } from "@/lib/types";
 
@@ -65,18 +65,7 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
                   <Link href={`/content/${row.id}`} className="primary-button">
                     Edit piece
                   </Link>
-                  <form action={deleteContent}>
-                    <input type="hidden" name="id" value={row.id} />
-                    <button
-                      type="submit"
-                      className="secondary-button"
-                      onClick={(e) => {
-                        if (!confirm("Delete this piece? This cannot be undone.")) e.preventDefault();
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </form>
+                  <DeleteButton id={row.id} />
                 </div>
               </div>
             ))

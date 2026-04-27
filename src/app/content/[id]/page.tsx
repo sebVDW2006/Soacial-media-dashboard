@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ContentForm } from "@/components/ContentForm";
-import { addKpi, deleteContent, markPosted, saveChannelSchedule, upsertContent } from "@/app/content/actions";
+import { DeleteButton } from "@/components/DeleteButton";
+import { addKpi, markPosted, saveChannelSchedule, upsertContent } from "@/app/content/actions";
 import { getAssets, getContentById, getReferenceData } from "@/lib/queries";
 import { formatDateTimeLocal } from "@/lib/week";
 
@@ -28,18 +29,7 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
             <h1 className="section-title">{detail.item.title}</h1>
             <p className="muted mt-2 text-sm">Edit the piece, schedule it, and log KPIs from this page.</p>
           </div>
-          <form action={deleteContent}>
-            <input type="hidden" name="id" value={detail.item.id} />
-            <button
-              type="submit"
-              className="secondary-button"
-              onClick={(e) => {
-                if (!confirm("Delete this piece? This cannot be undone.")) e.preventDefault();
-              }}
-            >
-              Delete piece
-            </button>
-          </form>
+          <DeleteButton id={detail.item.id} />
         </div>
       </section>
 
