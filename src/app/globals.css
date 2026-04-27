@@ -16,7 +16,7 @@
     --cream: #f8f8f4;
     --line: rgba(16, 19, 17, 0.08);
     --line-strong: rgba(16, 19, 17, 0.15);
-    --accent: #d5ff4c;
+    --accent: #cda870;
     --shadow: 0 14px 36px rgba(9, 11, 10, 0.05);
   }
 
@@ -54,7 +54,7 @@
   }
 
   ::selection {
-    background: rgba(213, 255, 76, 0.34);
+    background: rgba(205, 168, 112, 0.32);
     color: var(--ink);
   }
 
@@ -78,7 +78,7 @@
   select:focus-visible,
   textarea:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(213, 255, 76, 0.28);
+    box-shadow: 0 0 0 3px rgba(205, 168, 112, 0.24);
   }
 
   label {
@@ -88,7 +88,7 @@
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: rgba(23, 49, 38, 0.64);
+    color: rgba(69, 57, 44, 0.72);
   }
 
   input,
@@ -112,8 +112,8 @@
   select {
     appearance: none;
     background-image:
-      linear-gradient(45deg, transparent 50%, rgba(23, 49, 38, 0.85) 50%),
-      linear-gradient(135deg, rgba(23, 49, 38, 0.85) 50%, transparent 50%);
+      linear-gradient(45deg, transparent 50%, rgba(52, 42, 34, 0.85) 50%),
+      linear-gradient(135deg, rgba(52, 42, 34, 0.85) 50%, transparent 50%);
     background-position:
       calc(100% - 1.2rem) calc(50% - 2px),
       calc(100% - 0.9rem) calc(50% - 2px);
@@ -133,8 +133,8 @@
     outline: none;
     border-color: var(--line-strong);
     box-shadow:
-      0 0 0 4px rgba(32, 67, 51, 0.08),
-      inset 0 0 0 1px rgba(32, 67, 51, 0.08);
+      0 0 0 4px rgba(103, 81, 54, 0.08),
+      inset 0 0 0 1px rgba(103, 81, 54, 0.08);
   }
 
   button[type="submit"],
@@ -286,52 +286,9 @@
 
   .studio-accent-card {
     background:
-      radial-gradient(circle at 18% 18%, rgba(213, 255, 76, 0.24), transparent 34%),
-      rgba(255, 255, 255, 0.8);
-  }
-
-  .system-map {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .system-column,
-  .system-spine {
-    display: grid;
-    gap: 1rem;
-    align-content: start;
-  }
-
-  .system-spine {
-    position: relative;
-  }
-
-  .system-line {
-    display: none;
-  }
-
-  .system-node {
-    min-height: 76px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 24px;
-    border: 1px solid var(--line);
-    background: rgba(255, 255, 255, 0.8);
-    padding: 1rem 1.1rem;
-    text-align: center;
-    font-size: 0.84rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--brand);
-    box-shadow: var(--shadow);
-  }
-
-  .system-node.accent {
-    background:
-      radial-gradient(circle at 50% 50%, rgba(213, 255, 76, 0.34), transparent 72%),
-      rgba(255, 255, 255, 0.94);
+      radial-gradient(circle at 16% 18%, rgba(214, 192, 152, 0.28), transparent 34%),
+      radial-gradient(circle at 86% 20%, rgba(138, 158, 177, 0.14), transparent 30%),
+      rgba(255, 255, 255, 0.82);
   }
 
   .painting-feature {
@@ -375,25 +332,4 @@
     backdrop-filter: blur(8px);
   }
 
-  @media (min-width: 1024px) {
-    .system-map {
-      grid-template-columns: 1fr 1fr 1fr;
-      align-items: center;
-    }
-
-    .system-spine {
-      padding: 0 1rem;
-    }
-
-    .system-line {
-      display: block;
-      position: absolute;
-      top: 2rem;
-      bottom: 2rem;
-      left: 50%;
-      width: 1px;
-      transform: translateX(-50%);
-      background: linear-gradient(180deg, transparent, var(--line-strong), transparent);
-    }
-  }
 }

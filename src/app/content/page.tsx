@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { PaintingFeature } from "@/components/PaintingFeature";
+import { featuredInspiration } from "@/lib/inspiration";
 import { getContentItems } from "@/lib/queries";
 import type { ContentStatus } from "@/lib/types";
 
@@ -24,23 +26,32 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+      <section className="grid gap-8 2xl:grid-cols-[1.15fr_0.95fr]">
+        <div className="app-card p-8 sm:p-10 lg:p-12">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 1 + 2</p>
           <h1 className="section-title mt-2">Content pieces</h1>
-          <p className="muted mt-4 max-w-3xl">
-            This is the main working surface. Create the piece, open any draft again, and move straight from writing
-            into scheduling without hunting around the product.
+          <p className="muted mt-4 max-w-3xl leading-8">
+            This is the main working surface. Create the piece, reopen any draft, and move straight from writing into
+            scheduling without hunting around the product.
           </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href={brand === "all" ? "/content/new" : `/content/new?brand=${brand}`} className="primary-button">
+              Create new piece
+            </Link>
+            <Link href={brand === "all" ? "/inbox" : `/inbox?brand=${brand}`} className="secondary-button">
+              Open inbox
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Link href={brand === "all" ? "/content/new" : `/content/new?brand=${brand}`} className="primary-button">
-            Create new piece
-          </Link>
-          <Link href={brand === "all" ? "/inbox" : `/inbox?brand=${brand}`} className="secondary-button">
-            Open inbox
-          </Link>
-        </div>
+
+        <PaintingFeature
+          artwork={featuredInspiration.content}
+          eyebrow="Page atmosphere"
+          title="A drafting room with perspective."
+          copy="This page should feel like shaping a body of work. The mood is spacious, elevated, and practical enough to keep editing moving."
+          heightClass="min-h-[420px]"
+          align="top"
+        />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Kanban } from "@/components/Kanban";
+import { PaintingFeature } from "@/components/PaintingFeature";
 import { moveStatus } from "@/app/pipeline/actions";
+import { featuredInspiration } from "@/lib/inspiration";
 import { getContentItems } from "@/lib/queries";
 
 type PipelinePageProps = {
@@ -14,25 +16,34 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+      <section className="grid gap-8 2xl:grid-cols-[1.15fr_0.95fr]">
+        <div className="app-card p-8 sm:p-10 lg:p-12">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 4</p>
           <h1 className="section-title mt-2">Post flow</h1>
-          <p className="muted mt-4 max-w-2xl">
+          <p className="muted mt-4 max-w-2xl leading-8">
             See where each piece sits between drafting, captured, scheduled, posted, and tracked.
           </p>
+          <div className="mt-8 flex gap-2">
+            {(["all", "seb", "ublend"] as const).map((option) => (
+              <Link
+                key={option}
+                href={option === "all" ? "/pipeline" : `/pipeline?brand=${option}`}
+                className={`chip ${brand === option ? "active" : ""}`}
+              >
+                {option === "all" ? "All" : option === "seb" ? "Seb" : "uBlend"}
+              </Link>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-2">
-          {(["all", "seb", "ublend"] as const).map((option) => (
-            <Link
-              key={option}
-              href={option === "all" ? "/pipeline" : `/pipeline?brand=${option}`}
-              className={`chip ${brand === option ? "active" : ""}`}
-            >
-              {option === "all" ? "All" : option === "seb" ? "Seb" : "uBlend"}
-            </Link>
-          ))}
-        </div>
+
+        <PaintingFeature
+          artwork={featuredInspiration.pipeline}
+          eyebrow="Page atmosphere"
+          title="Pressure, movement, and clean stage changes."
+          copy="This page should hold momentum without feeling frantic. You’re just moving each piece to its next honest state."
+          heightClass="min-h-[420px]"
+          align="top"
+        />
       </section>
 
       <Kanban

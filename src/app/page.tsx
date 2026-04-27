@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { KPIBars } from "@/components/KPIBars";
 import { PaintingFeature } from "@/components/PaintingFeature";
-import { SystemMap } from "@/components/SystemMap";
 import { WorkflowSteps } from "@/components/WorkflowSteps";
 import { weeklyFlow } from "@/lib/content-framework";
 import { featuredInspiration } from "@/lib/inspiration";
@@ -44,7 +43,7 @@ export default async function DashboardPage() {
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Idea inbox</p>
               <p className="mt-2 text-4xl font-bold tracking-[-0.08em]">{dashboard.ideaCount}</p>
               <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">Unshaped thoughts waiting to become formats.</p>
-              <Link href="/inbox" className="mt-4 inline-flex text-sm font-semibold text-emerald-900">
+              <Link href="/inbox" className="mt-4 inline-flex text-sm font-semibold text-[var(--brand)]">
                 Open inbox
               </Link>
             </div>
@@ -53,7 +52,7 @@ export default async function DashboardPage() {
               <p className="mt-2 text-xl font-bold">{dashboard.captureSession.capture_date}</p>
               <p className="mt-1 text-sm text-stone-500">{dashboard.captureSession.status}</p>
               <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">Tuesday is the raw material day for the whole week.</p>
-              <Link href="/capture" className="mt-4 inline-flex text-sm font-semibold text-emerald-900">
+              <Link href="/capture" className="mt-4 inline-flex text-sm font-semibold text-[var(--brand)]">
                 Plan Tuesday
               </Link>
             </div>
@@ -67,7 +66,7 @@ export default async function DashboardPage() {
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Weekly review</p>
               <p className="mt-2 text-xl font-bold">{dashboard.reviewMissing ? "Missing" : "Captured"}</p>
               <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">Close the loop so taste, proof, and performance stay connected.</p>
-              <Link href={`/reviews/${dashboard.week}`} className="mt-4 inline-flex text-sm font-semibold text-emerald-900">
+              <Link href={`/reviews/${dashboard.week}`} className="mt-4 inline-flex text-sm font-semibold text-[var(--brand)]">
                 Sunday review
               </Link>
             </div>
@@ -85,12 +84,11 @@ export default async function DashboardPage() {
 
       <WorkflowSteps />
 
-      <section className="grid gap-4 2xl:grid-cols-[1.25fr_0.9fr]">
-        <SystemMap />
+      <section className="grid gap-4">
         <section className="app-card p-7 sm:p-8 lg:p-10">
           <div className="eyebrow">Weekly pulse</div>
           <h2 className="sub-title mt-3 text-[var(--brand)]">What the week is asking for.</h2>
-          <div className="mt-8 space-y-4">
+          <div className="mt-8 grid gap-4 xl:grid-cols-5">
             {weeklyFlow.map((item, index) => (
               <div key={item.day} className={`soft-card p-5 ${index === 1 ? "studio-accent-card" : ""}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -104,7 +102,7 @@ export default async function DashboardPage() {
                   </div>
                   <span className={`chip ${index === 1 ? "active" : ""}`}>{item.output}</span>
                 </div>
-                <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">{item.detail}</p>
+                <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">{item.detail}</p>
               </div>
             ))}
           </div>
@@ -115,7 +113,7 @@ export default async function DashboardPage() {
         <div className="app-card p-5 xl:col-span-2">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="sub-title">Scheduled output</h2>
-            <Link href="/calendar" className="text-sm font-semibold text-emerald-900">
+            <Link href="/calendar" className="text-sm font-semibold text-[var(--brand)]">
               Open calendar
             </Link>
           </div>

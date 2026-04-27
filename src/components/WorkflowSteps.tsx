@@ -1,12 +1,14 @@
 import Link from "next/link";
+import { inspirationArtworks } from "@/lib/inspiration";
 
 const steps = [
   {
     step: "01",
     title: "Create content pieces",
     copy: "Start a new post or promote an idea into a real content piece.",
-    href: "/content",
-    cta: "Open content pieces",
+    href: "/content/new",
+    cta: "Create piece",
+    artwork: inspirationArtworks[10],
   },
   {
     step: "02",
@@ -14,6 +16,7 @@ const steps = [
     copy: "Shape the hook, body, close, proof, and channel plan while the format stays visible.",
     href: "/content",
     cta: "Edit pieces",
+    artwork: inspirationArtworks[7],
   },
   {
     step: "03",
@@ -21,6 +24,7 @@ const steps = [
     copy: "Place the content into the weekly calendar so the week has a clear publishing plan.",
     href: "/calendar",
     cta: "Open schedule",
+    artwork: inspirationArtworks[11],
   },
   {
     step: "04",
@@ -28,6 +32,7 @@ const steps = [
     copy: "Move work through drafting, captured, scheduled, posted, and tracked without losing momentum.",
     href: "/pipeline",
     cta: "View post flow",
+    artwork: inspirationArtworks[12],
   },
   {
     step: "05",
@@ -35,6 +40,7 @@ const steps = [
     copy: "Log KPI snapshots and see what formats, pillars, and channels are actually working.",
     href: "/kpis",
     cta: "Track data",
+    artwork: inspirationArtworks[1],
   },
 ];
 
@@ -51,18 +57,30 @@ export function WorkflowSteps() {
       </div>
 
       <div className="mt-8 grid gap-4 xl:grid-cols-5">
-        {steps.map((step, index) => (
+        {steps.map((step) => (
           <Link
             key={step.step}
             href={step.href}
-            className={`soft-card block p-5 ${index === 0 ? "studio-accent-card" : ""}`}
+            className="soft-card block h-full overflow-hidden"
           >
-            <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-              Step {step.step}
+            <div
+              className="h-28 w-full bg-cover bg-center"
+              style={{
+                backgroundImage: `linear-gradient(180deg, rgba(10, 12, 11, 0.04), rgba(10, 12, 11, 0.22)), url(${step.artwork.src})`,
+              }}
+            />
+            <div className="flex min-h-[238px] flex-col p-5">
+              <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
+                Step {step.step}
+              </div>
+              <h3 className="mt-3 text-[1.25rem] font-semibold tracking-[-0.04em] text-[var(--brand)]">
+                {step.title}
+              </h3>
+              <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">{step.copy}</p>
+              <div className="mt-auto pt-5">
+                <span className="chip active">{step.cta}</span>
+              </div>
             </div>
-            <h3 className="mt-3 text-[1.25rem] font-semibold tracking-[-0.04em] text-[var(--brand)]">{step.title}</h3>
-            <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">{step.copy}</p>
-            <div className="mt-5 text-sm font-semibold text-emerald-900">{step.cta}</div>
           </Link>
         ))}
       </div>

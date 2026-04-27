@@ -44,7 +44,7 @@ export function WeeklyCalendar({
                     </h3>
                     <Link
                       href={`/content/new?date=${day.date}&brand=${brand}`}
-                      className="text-xs font-semibold text-ember"
+                      className="text-xs font-semibold text-[var(--brand)]"
                     >
                       Add
                     </Link>
@@ -79,4 +79,3 @@ export function WeeklyCalendar({
     </div>
   );
 }
-

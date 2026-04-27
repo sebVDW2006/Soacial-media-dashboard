@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { ContentForm } from "@/components/ContentForm";
+import { PaintingFeature } from "@/components/PaintingFeature";
 import { addKpi, markPosted, saveChannelSchedule, upsertContent } from "@/app/content/actions";
+import { featuredInspiration } from "@/lib/inspiration";
 import { getAssets, getContentById, getReferenceData } from "@/lib/queries";
 import { formatDateTimeLocal } from "@/lib/week";
 
@@ -27,12 +29,23 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
 
   return (
     <div className="space-y-6">
-      <section>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 2</p>
-        <h1 className="section-title mt-2">{detail.item.title}</h1>
-        <p className="muted mt-4 max-w-2xl">
-          Edit the piece, then handle scheduling, posting, and KPI capture from the same page.
-        </p>
+      <section className="grid gap-8 2xl:grid-cols-[1.15fr_0.95fr]">
+        <div className="app-card p-8 sm:p-10 lg:p-12">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 2</p>
+          <h1 className="section-title mt-2">{detail.item.title}</h1>
+          <p className="muted mt-4 max-w-2xl leading-8">
+            Edit the piece, then handle scheduling, posting, and KPI capture from the same page.
+          </p>
+        </div>
+
+        <PaintingFeature
+          artwork={featuredInspiration.content}
+          eyebrow="Page atmosphere"
+          title="Refine the piece without losing the mood."
+          copy="The editor should feel composed and serious: one source piece, clear choices, and enough atmosphere to keep the work expressive."
+          heightClass="min-h-[380px]"
+          align="top"
+        />
       </section>
 
       <ContentForm

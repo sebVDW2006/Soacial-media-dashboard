@@ -90,6 +90,10 @@ export const featuredInspiration = {
   dashboard: inspirationArtworks[0],
   capture: inspirationArtworks[3],
   formats: inspirationArtworks[6],
+  content: inspirationArtworks[10],
+  calendar: inspirationArtworks[11],
+  pipeline: inspirationArtworks[12],
+  kpis: inspirationArtworks[1],
 };
 
 export const formatArtworkBySlug: Record<string, InspirationArtwork> = {

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { KPIBars } from "@/components/KPIBars";
+import { PaintingFeature } from "@/components/PaintingFeature";
+import { featuredInspiration } from "@/lib/inspiration";
 import { getKpiSummaryRows, getTopKpiPosts } from "@/lib/queries";
 
 type KpisPageProps = {
@@ -22,37 +24,46 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+      <section className="grid gap-8 2xl:grid-cols-[1.15fr_0.95fr]">
+        <div className="app-card p-8 sm:p-10 lg:p-12">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 5</p>
           <h1 className="section-title mt-2">Track data</h1>
-          <p className="muted mt-4 max-w-2xl">
+          <p className="muted mt-4 max-w-2xl leading-8">
             Capture the actual results after posting so you can see what formats, pillars, and channels are working.
           </p>
+          <form className="mt-8 grid gap-3 md:grid-cols-2">
+            <div>
+              <label>Group by</label>
+              <select name="groupBy" defaultValue={groupBy}>
+                <option value="format">Format</option>
+                <option value="pillar">Pillar</option>
+                <option value="channel">Channel</option>
+                <option value="brand">Brand</option>
+              </select>
+            </div>
+            <div>
+              <label>Range</label>
+              <select name="range" defaultValue={String(range)}>
+                <option value="30">Last 30 days</option>
+                <option value="14">Last 14 days</option>
+                <option value="7">Last 7 days</option>
+                <option value="60">Last 60 days</option>
+              </select>
+            </div>
+            <button type="submit" className="secondary-button md:col-span-2">
+              Refresh
+            </button>
+          </form>
         </div>
-        <form className="app-card grid gap-3 p-4 md:grid-cols-2">
-          <div>
-            <label>Group by</label>
-            <select name="groupBy" defaultValue={groupBy}>
-              <option value="format">Format</option>
-              <option value="pillar">Pillar</option>
-              <option value="channel">Channel</option>
-              <option value="brand">Brand</option>
-            </select>
-          </div>
-          <div>
-            <label>Range</label>
-            <select name="range" defaultValue={String(range)}>
-              <option value="30">Last 30 days</option>
-              <option value="14">Last 14 days</option>
-              <option value="7">Last 7 days</option>
-              <option value="60">Last 60 days</option>
-            </select>
-          </div>
-          <button type="submit" className="secondary-button md:col-span-2">
-            Refresh
-          </button>
-        </form>
+
+        <PaintingFeature
+          artwork={featuredInspiration.kpis}
+          eyebrow="Page atmosphere"
+          title="Measure force after the drop."
+          copy="The data page should feel analytical, but still alive. This is where the creative decisions meet the real outcome."
+          heightClass="min-h-[420px]"
+          align="top"
+        />
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
