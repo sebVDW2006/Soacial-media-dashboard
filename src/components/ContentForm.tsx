@@ -7,6 +7,12 @@ import { ChannelMultiSelect } from "@/components/ChannelMultiSelect";
 import { blueprintBySlug, weeklyFlow } from "@/lib/content-framework";
 import { formatArtworkBySlug } from "@/lib/inspiration";
 
+// Which pillar slugs are relevant per brand
+const PILLAR_BRAND_SLUGS: Record<"seb" | "ublend", string[]> = {
+  seb: ["startup-journey", "discipline-lifestyle", "faith-integrity"],
+  ublend: ["startup-journey", "b2b-experience", "healthy-eating"],
+};
+
 const defaultChannelMap: Record<string, string[]> = {
   "founder-lesson": ["seb_linkedin", "seb_instagram", "youtube_shorts"],
   "raw-build-update": ["seb_instagram", "ublend_instagram", "seb_linkedin"],
@@ -56,6 +62,7 @@ export function ContentForm({
 
   const [formatId, setFormatId] = useState(initialFormatId);
   const [brand, setBrand] = useState<"seb" | "ublend">(item?.brand ?? initialBrand ?? "seb");
+  const [pillarId, setPillarId] = useState(initialPillarId);
   const [hook, setHook] = useState(item?.hook ?? "");
   const [body, setBody] = useState(item?.body ?? "");
   const [close, setClose] = useState(item?.close ?? "");
@@ -65,6 +72,12 @@ export function ContentForm({
       : formatChannelDefaults(formatLookup.get(initialFormatId), channels),
   );
   const [selectedAssets, setSelectedAssets] = useState<number[]>(linkedAssetIds);
+  // Only show pillars that belong to the selected brand
+  const visiblePillars = useMemo(
+    () => pillars.filter((p) => PILLAR_BRAND_SLUGS[brand].includes(p.slug)),
+    [pillars, brand],
+  );
+
   const selectedFormat = formatLookup.get(formatId);
   const selectedBlueprint = selectedFormat ? blueprintBySlug[selectedFormat.slug] : undefined;
   const selectedArtwork = selectedFormat ? formatArtworkBySlug[selectedFormat.slug] : undefined;
@@ -83,6 +96,17 @@ export function ContentForm({
       if (!selectedChannels.length) {
         setSelectedChannels(formatChannelDefaults(nextFormat, channels));
       }
+    }
+  };
+
+  const handleBrandChange = (nextBrand: "seb" | "ublend") => {
+    setBrand(nextBrand);
+    // If the currently selected pillar isn't valid for the new brand, pick the first valid one
+    const validSlugs = PILLAR_BRAND_SLUGS[nextBrand];
+    const currentPillar = pillars.find((p) => p.id === pillarId);
+    if (!currentPillar || !validSlugs.includes(currentPillar.slug)) {
+      const firstValid = pillars.find((p) => validSlugs.includes(p.slug));
+      if (firstValid) setPillarId(firstValid.id);
     }
   };
 
@@ -140,8 +164,13 @@ export function ContentForm({
               </div>
               <div>
                 <label htmlFor="pillar_id">Pillar</label>
-                <select id="pillar_id" name="pillar_id" defaultValue={initialPillarId}>
-                  {pillars.map((pillar) => (
+                <select
+                  id="pillar_id"
+                  name="pillar_id"
+                  value={pillarId}
+                  onChange={(e) => setPillarId(Number(e.target.value))}
+                >
+                  {visiblePillars.map((pillar) => (
                     <option key={pillar.id} value={pillar.id}>
                       {pillar.name}
                     </option>
@@ -166,7 +195,7 @@ export function ContentForm({
                   <button
                     key={option}
                     type="button"
-                    onClick={() => setBrand(option)}
+                    onClick={() => handleBrandChange(option)}
                     className={`soft-card min-h-[56px] px-4 py-3 text-left ${
                       brand === option ? "border-[var(--brand)] bg-white/95" : ""
                     }`}
