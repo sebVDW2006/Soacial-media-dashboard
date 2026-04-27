@@ -3,20 +3,24 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
-const links = [
+const primaryLinks = [
   ["/", "Dashboard"],
+  ["/content", "Content pieces"],
+  ["/calendar", "Schedule"],
+  ["/pipeline", "Post flow"],
+  ["/kpis", "Track data"],
+];
+
+const utilityLinks = [
   ["/inbox", "Inbox"],
-  ["/calendar", "Calendar"],
-  ["/pipeline", "Pipeline"],
-  ["/capture", "Capture"],
+  ["/capture", "Capture day"],
   ["/assets", "Assets"],
   ["/formats", "Formats"],
-  ["/kpis", "KPIs"],
   ["/reviews", "Reviews"],
   ["/settings", "Settings"],
 ];
 
-function buildUrl(pathname: string, searchParams: URLSearchParams, brand: string) {
+function buildBrandToggleUrl(pathname: string, searchParams: URLSearchParams, brand: string) {
   const params = new URLSearchParams(searchParams.toString());
 
   if (brand === "all") {
@@ -27,6 +31,16 @@ function buildUrl(pathname: string, searchParams: URLSearchParams, brand: string
 
   const query = params.toString();
   return query ? `${pathname}?${query}` : pathname;
+}
+
+function buildSectionUrl(pathname: string, brand: string) {
+  if (brand === "all") return pathname;
+  return `${pathname}?brand=${brand}`;
+}
+
+function isActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function Nav() {
@@ -57,7 +71,7 @@ export function Nav() {
               {(["all", "seb", "ublend"] as const).map((option) => (
                 <Link
                   key={option}
-                  href={buildUrl(pathname, new URLSearchParams(searchParams.toString()), option)}
+                  href={buildBrandToggleUrl(pathname, new URLSearchParams(searchParams.toString()), option)}
                   className={`rounded-full px-5 py-2.5 text-[0.72rem] font-semibold uppercase tracking-[0.14em] ${
                     brand === option
                       ? "bg-[var(--brand)] text-white"
@@ -72,17 +86,37 @@ export function Nav() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 rounded-[34px] border border-[var(--line)] bg-white/70 p-2 shadow-sm">
-          {links.map(([href, label]) => {
-            const active = pathname === href;
+          {primaryLinks.map(([href, label]) => {
+            const active = isActive(pathname, href);
 
             return (
               <Link
                 key={href}
-                href={href}
+                href={buildSectionUrl(href, brand)}
                 className={`rounded-full px-5 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.14em] whitespace-nowrap ${
                   active
                     ? "bg-[var(--brand)] text-white"
                     : "text-[var(--ink)] hover:bg-[var(--brand)] hover:text-white"
+                }`}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {utilityLinks.map(([href, label]) => {
+            const active = isActive(pathname, href);
+
+            return (
+              <Link
+                key={href}
+                href={buildSectionUrl(href, brand)}
+                className={`rounded-full border px-4 py-2.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] whitespace-nowrap ${
+                  active
+                    ? "border-[var(--brand)] bg-[var(--brand)] text-white"
+                    : "border-[var(--line)] bg-white/60 text-[var(--ink)] hover:border-[var(--brand)] hover:text-[var(--brand)]"
                 }`}
               >
                 {label}

@@ -24,10 +24,10 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     <div className="space-y-6">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 9</p>
-          <h1 className="section-title mt-2">KPIs</h1>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 5</p>
+          <h1 className="section-title mt-2">Track data</h1>
           <p className="muted mt-4 max-w-2xl">
-            Latest snapshot per content-channel, grouped the way you want, without a charting library.
+            Capture the actual results after posting so you can see what formats, pillars, and channels are working.
           </p>
         </div>
         <form className="app-card grid gap-3 p-4 md:grid-cols-2">
@@ -85,4 +85,3 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     </div>
   );
 }
-

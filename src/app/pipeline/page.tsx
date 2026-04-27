@@ -16,10 +16,10 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
     <div className="space-y-6">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 6</p>
-          <h1 className="section-title mt-2">Pipeline</h1>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 4</p>
+          <h1 className="section-title mt-2">Post flow</h1>
           <p className="muted mt-4 max-w-2xl">
-            View the whole system as a single lane from idea to tracked. Use the quick controls below when something needs a manual stage bump.
+            See where each piece sits between drafting, captured, scheduled, posted, and tracked.
           </p>
         </div>
         <div className="flex gap-2">
@@ -82,4 +82,3 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
     </div>
   );
 }
-

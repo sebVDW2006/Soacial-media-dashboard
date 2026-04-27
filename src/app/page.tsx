@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { InspirationGallery } from "@/components/InspirationGallery";
 import { KPIBars } from "@/components/KPIBars";
 import { PaintingFeature } from "@/components/PaintingFeature";
 import { SystemMap } from "@/components/SystemMap";
-import { WorkspaceDeck } from "@/components/WorkspaceDeck";
+import { WorkflowSteps } from "@/components/WorkflowSteps";
 import { weeklyFlow } from "@/lib/content-framework";
-import { featuredInspiration, inspirationArtworks } from "@/lib/inspiration";
+import { featuredInspiration } from "@/lib/inspiration";
 import { getDashboardData, getKpiSummaryRows } from "@/lib/queries";
 
 export default async function DashboardPage() {
@@ -84,7 +83,7 @@ export default async function DashboardPage() {
         />
       </section>
 
-      <WorkspaceDeck />
+      <WorkflowSteps />
 
       <section className="grid gap-4 2xl:grid-cols-[1.25fr_0.9fr]">
         <SystemMap />
@@ -111,17 +110,6 @@ export default async function DashboardPage() {
           </div>
         </section>
       </section>
-
-      <InspirationGallery
-        title="Reference atmosphere"
-        copy="The mood is there to sharpen the work, not distract from it: light, order, weather, pressure, and long horizons. Keep the interface useful, then let the references lift the standard."
-        artworks={[
-          inspirationArtworks[5],
-          inspirationArtworks[10],
-          inspirationArtworks[8],
-          inspirationArtworks[12],
-        ]}
-      />
 
       <section className="grid gap-4 xl:grid-cols-3">
         <div className="app-card p-5 xl:col-span-2">

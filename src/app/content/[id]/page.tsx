@@ -28,10 +28,10 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
   return (
     <div className="space-y-6">
       <section>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Content editor</p>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 2</p>
         <h1 className="section-title mt-2">{detail.item.title}</h1>
         <p className="muted mt-4 max-w-2xl">
-          One source post, many channel-specific schedule and KPI rows underneath it.
+          Edit the piece, then handle scheduling, posting, and KPI capture from the same page.
         </p>
       </section>
 
@@ -162,4 +162,3 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
     </div>
   );
 }
-
