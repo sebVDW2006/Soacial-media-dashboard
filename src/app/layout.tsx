@@ -28,15 +28,19 @@ export default function RootLayout({
           <Suspense
             fallback={
               <header className="top-nav">
-                <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-4 py-4">
-                  <span className="text-2xl font-bold tracking-[-0.08em] text-leaf">Content OS</span>
+                <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+                  <span className="text-[1.85rem] font-semibold tracking-[-0.08em] text-[var(--brand)]">
+                    Content OS
+                  </span>
                 </div>
               </header>
             }
           >
             <Nav />
           </Suspense>
-          <main className="page-wrap">{children}</main>
+          <main className="mx-auto w-full max-w-[1180px] px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+            {children}
+          </main>
         </div>
       </body>
     </html>

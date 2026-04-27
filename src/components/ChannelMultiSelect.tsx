@@ -22,11 +22,11 @@ export function ChannelMultiSelect({
               key={channel.id}
               type="button"
               onClick={() => onToggle(channel.id)}
-              className={`soft-card flex min-h-[52px] items-center justify-between px-4 py-3 text-left ${
-                checked ? "border-leaf bg-amber-50" : ""
+              className={`soft-card flex min-h-[56px] items-center justify-between px-4 py-3 text-left ${
+                checked ? "border-[var(--brand)] bg-white/95" : ""
               }`}
             >
-              <span className="font-semibold">{channel.name}</span>
+              <span className="font-semibold text-[var(--brand)]">{channel.name}</span>
               <span className="chip">{checked ? "On" : "Off"}</span>
             </button>
           );

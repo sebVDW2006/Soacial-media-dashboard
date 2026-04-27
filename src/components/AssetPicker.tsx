@@ -48,7 +48,7 @@ export function AssetPicker({
               key={asset.id}
               type="button"
               onClick={() => onToggle(asset.id)}
-              className={`soft-card overflow-hidden text-left ${selected ? "border-leaf bg-amber-50" : ""}`}
+              className={`soft-card overflow-hidden text-left ${selected ? "border-[var(--brand)] bg-white/95" : ""}`}
             >
               {asset.url && isImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -80,4 +80,3 @@ export function AssetPicker({
     </div>
   );
 }
-

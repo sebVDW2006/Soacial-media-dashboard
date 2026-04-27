@@ -35,40 +35,50 @@ export function Nav() {
   const brand = searchParams.get("brand") ?? "all";
 
   return (
-    <header className="top-nav">
-      <div className="mx-auto flex max-w-[1240px] flex-col gap-3 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center justify-between gap-4">
-          <Link href="/" className="text-2xl font-bold tracking-[-0.08em] text-leaf">
-            Content OS
-          </Link>
-          <div className="hidden gap-2 lg:flex">
+    <nav className="top-nav">
+      <div className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <Link href="/" className="text-[1.85rem] font-semibold tracking-[-0.08em] text-[var(--brand)]">
+          Content OS
+        </Link>
+
+        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center gap-2 rounded-full border border-[var(--line)] bg-white/60 p-1.5 shadow-sm">
             {(["all", "seb", "ublend"] as const).map((option) => (
               <Link
                 key={option}
                 href={buildUrl(pathname, new URLSearchParams(searchParams.toString()), option)}
-                className={`chip ${brand === option ? "active" : ""}`}
+                className={`rounded-full px-4 py-2 text-[0.72rem] font-semibold uppercase tracking-[0.14em] ${
+                  brand === option
+                    ? "bg-[var(--brand)] text-white"
+                    : "text-[var(--ink)] hover:bg-[var(--brand)] hover:text-white"
+                }`}
               >
                 {option === "all" ? "All brands" : option === "seb" ? "Seb" : "uBlend"}
               </Link>
             ))}
           </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-full border border-[var(--line)] bg-white/60 p-1.5 shadow-sm">
+            {links.map(([href, label]) => {
+              const active = pathname === href;
+
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`rounded-full px-4 py-2 text-[0.72rem] font-semibold uppercase tracking-[0.14em] whitespace-nowrap ${
+                    active
+                      ? "bg-[var(--brand)] text-white"
+                      : "text-[var(--ink)] hover:bg-[var(--brand)] hover:text-white"
+                  }`}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
         </div>
-        <nav className="flex gap-2 overflow-x-auto pb-1">
-          {links.map(([href, label]) => {
-            const active = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`chip whitespace-nowrap ${active ? "active" : ""}`}
-              >
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
       </div>
-    </header>
+    </nav>
   );
 }
-
