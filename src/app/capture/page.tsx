@@ -9,9 +9,9 @@ export default async function CapturePage() {
   const assets = (await getAssets()).filter((asset) => asset.capture_session_id === session.id);
 
   return (
-    <div className="space-y-8">
-      <section className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
-        <div className="app-card p-7 sm:p-9">
+    <div className="space-y-10">
+      <section className="grid gap-8 2xl:grid-cols-[1.75fr_1fr]">
+        <div className="app-card p-8 sm:p-10 lg:p-12">
           <div className="flex flex-wrap gap-2">
             <span className="chip active">Tuesday capture day</span>
             <span className="chip">One capture space</span>
@@ -21,19 +21,19 @@ export default async function CapturePage() {
           <h1 className="section-title mt-5 max-w-4xl text-[var(--brand)]">
             Capture once. Draft with clarity all week.
           </h1>
-          <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--ink-soft)] sm:text-lg">
+          <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--ink-soft)]">
             This page is your single capture space. Log the founder clip, product shots, lifestyle footage, proof,
             and photos here first, then use them to draft Monday through Friday without hunting around.
           </p>
 
-          <div className="mt-7 flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-wrap gap-3">
             <Link href={`/capture/${session.id}`} className="secondary-button">
               Open session permalink
             </Link>
           </div>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            <div className="soft-card p-4">
+          <div className="mt-10 grid gap-4 sm:grid-cols-3">
+            <div className="soft-card p-5">
               <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
                 Capture date
               </div>
@@ -41,7 +41,7 @@ export default async function CapturePage() {
                 {session.capture_date}
               </div>
             </div>
-            <div className="soft-card p-4">
+            <div className="soft-card p-5">
               <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
                 Status
               </div>
@@ -49,7 +49,7 @@ export default async function CapturePage() {
                 {session.status}
               </div>
             </div>
-            <div className="soft-card p-4">
+            <div className="soft-card p-5">
               <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
                 Assets logged
               </div>
@@ -60,14 +60,14 @@ export default async function CapturePage() {
           </div>
         </div>
 
-        <div className="app-card p-6 sm:p-7">
+        <div className="app-card p-8 sm:p-9">
           <div className="eyebrow">Weekly flow</div>
           <h2 className="mt-3 text-[2rem] font-semibold tracking-[-0.05em] text-[var(--brand)]">
             Tuesday creates the week
           </h2>
-          <div className="mt-5 space-y-4">
+          <div className="mt-6 space-y-5">
             {weeklyFlow.map((item) => (
-              <div key={item.day} className="rounded-[22px] border border-[var(--line)] bg-white/55 p-4">
+              <div key={item.day} className="rounded-[26px] border border-[var(--line)] bg-white/55 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">

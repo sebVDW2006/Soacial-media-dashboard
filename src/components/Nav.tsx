@@ -36,18 +36,18 @@ export function Nav() {
 
   return (
     <nav className="top-nav">
-      <div className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-        <Link href="/" className="text-[1.85rem] font-semibold tracking-[-0.08em] text-[var(--brand)]">
-          Content OS
-        </Link>
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-6 py-5 lg:px-10">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <Link href="/" className="text-[2rem] font-semibold tracking-[-0.08em] text-[var(--brand)]">
+            Content OS
+          </Link>
 
-        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-          <div className="flex flex-wrap items-center gap-2 rounded-full border border-[var(--line)] bg-white/60 p-1.5 shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 rounded-full border border-[var(--line)] bg-white/70 p-2 shadow-sm">
             {(["all", "seb", "ublend"] as const).map((option) => (
               <Link
                 key={option}
                 href={buildUrl(pathname, new URLSearchParams(searchParams.toString()), option)}
-                className={`rounded-full px-4 py-2 text-[0.72rem] font-semibold uppercase tracking-[0.14em] ${
+                className={`rounded-full px-5 py-2.5 text-[0.72rem] font-semibold uppercase tracking-[0.14em] ${
                   brand === option
                     ? "bg-[var(--brand)] text-white"
                     : "text-[var(--ink)] hover:bg-[var(--brand)] hover:text-white"
@@ -57,26 +57,26 @@ export function Nav() {
               </Link>
             ))}
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2 rounded-full border border-[var(--line)] bg-white/60 p-1.5 shadow-sm">
-            {links.map(([href, label]) => {
-              const active = pathname === href;
+        <div className="flex flex-wrap items-center gap-3 rounded-[34px] border border-[var(--line)] bg-white/70 p-2 shadow-sm">
+          {links.map(([href, label]) => {
+            const active = pathname === href;
 
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`rounded-full px-4 py-2 text-[0.72rem] font-semibold uppercase tracking-[0.14em] whitespace-nowrap ${
-                    active
-                      ? "bg-[var(--brand)] text-white"
-                      : "text-[var(--ink)] hover:bg-[var(--brand)] hover:text-white"
-                  }`}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-          </div>
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`rounded-full px-5 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.14em] whitespace-nowrap ${
+                  active
+                    ? "bg-[var(--brand)] text-white"
+                    : "text-[var(--ink)] hover:bg-[var(--brand)] hover:text-white"
+                }`}
+              >
+                {label}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </nav>
