@@ -298,6 +298,27 @@ export function ContentForm({
                 </div>
               </div>
 
+              <div className="grid gap-3">
+                <div className="soft-card p-4">
+                  <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
+                    Voice
+                  </div>
+                  <div className="mt-2 text-sm leading-7 text-[var(--ink)]">{selectedBlueprint.voice}</div>
+                </div>
+                <div className="soft-card p-4">
+                  <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
+                    Proof to include
+                  </div>
+                  <div className="mt-2 text-sm leading-7 text-[var(--ink)]">{selectedBlueprint.proofPrompt}</div>
+                </div>
+                <div className="soft-card p-4 studio-accent-card">
+                  <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
+                    Creative cue
+                  </div>
+                  <div className="mt-2 text-sm leading-7 text-[var(--ink)]">{selectedBlueprint.creativeCue}</div>
+                </div>
+              </div>
+
               <div className="rounded-[24px] border border-[var(--line)] bg-white/55 p-5">
                 <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
                   Structure

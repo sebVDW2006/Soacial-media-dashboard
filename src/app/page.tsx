@@ -2,6 +2,9 @@ import Link from "next/link";
 import { InspirationGallery } from "@/components/InspirationGallery";
 import { KPIBars } from "@/components/KPIBars";
 import { PaintingFeature } from "@/components/PaintingFeature";
+import { SystemMap } from "@/components/SystemMap";
+import { WorkspaceDeck } from "@/components/WorkspaceDeck";
+import { weeklyFlow } from "@/lib/content-framework";
 import { featuredInspiration, inspirationArtworks } from "@/lib/inspiration";
 import { getDashboardData, getKpiSummaryRows } from "@/lib/queries";
 
@@ -22,23 +25,26 @@ export default async function DashboardPage() {
         Math.ceil((new Date(nextPostDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)),
       )
     : null;
+  const leadingFormat = formatSummary[0]?.label ?? "No format data yet";
 
   return (
     <div className="space-y-8">
       <section className="grid gap-8 2xl:grid-cols-[1.2fr_0.9fr]">
         <div className="app-card p-8 sm:p-10 lg:p-12">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">This week</p>
-          <h1 className="section-title mt-3">{dashboard.week}</h1>
-          <p className="muted mt-4 max-w-xl text-base">
+          <h1 className="section-title mt-3">Creative operating system</h1>
+          <p className="muted mt-4 max-w-3xl text-base leading-8">
             {daysUntil !== null
               ? `${daysUntil} day${daysUntil === 1 ? "" : "s"} until the next scheduled post.`
               : "Nothing is scheduled yet."}{" "}
-            {nextPostDay}
+            {nextPostDay}. The point of this workspace is to keep the system practical while protecting the creative
+            atmosphere behind the work.
           </p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className="soft-card p-4">
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Idea inbox</p>
               <p className="mt-2 text-4xl font-bold tracking-[-0.08em]">{dashboard.ideaCount}</p>
+              <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">Unshaped thoughts waiting to become formats.</p>
               <Link href="/inbox" className="mt-4 inline-flex text-sm font-semibold text-emerald-900">
                 Open inbox
               </Link>
@@ -47,15 +53,21 @@ export default async function DashboardPage() {
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Capture day</p>
               <p className="mt-2 text-xl font-bold">{dashboard.captureSession.capture_date}</p>
               <p className="mt-1 text-sm text-stone-500">{dashboard.captureSession.status}</p>
+              <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">Tuesday is the raw material day for the whole week.</p>
               <Link href="/capture" className="mt-4 inline-flex text-sm font-semibold text-emerald-900">
                 Plan Tuesday
               </Link>
             </div>
             <div className="soft-card p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Leading format</p>
+              <p className="mt-2 text-xl font-bold">{leadingFormat}</p>
+              <p className="mt-1 text-sm text-stone-500">Last 4 weeks</p>
+              <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">Use this to see which repeatable angle is carrying momentum.</p>
+            </div>
+            <div className="soft-card p-4">
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Weekly review</p>
-              <p className="mt-2 text-xl font-bold">
-                {dashboard.reviewMissing ? "Missing" : "Captured"}
-              </p>
+              <p className="mt-2 text-xl font-bold">{dashboard.reviewMissing ? "Missing" : "Captured"}</p>
+              <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">Close the loop so taste, proof, and performance stay connected.</p>
               <Link href={`/reviews/${dashboard.week}`} className="mt-4 inline-flex text-sm font-semibold text-emerald-900">
                 Sunday review
               </Link>
@@ -66,15 +78,43 @@ export default async function DashboardPage() {
         <PaintingFeature
           artwork={featuredInspiration.dashboard}
           eyebrow="Creative inspiration"
-          title="Build the system in a bigger atmosphere."
-          copy="This workspace should feel more like composing a body of work than filling in a dashboard. Use the paintings as cues for rhythm, scale, clarity, and tone."
+          title="A cleaner system for a more expressive body of work."
+          copy="The references are here to hold the emotional and visual standard. The product itself should stay calm, useful, and very close to the actual way you create content."
           heightClass="min-h-[560px]"
         />
       </section>
 
+      <WorkspaceDeck />
+
+      <section className="grid gap-4 2xl:grid-cols-[1.25fr_0.9fr]">
+        <SystemMap />
+        <section className="app-card p-7 sm:p-8 lg:p-10">
+          <div className="eyebrow">Weekly pulse</div>
+          <h2 className="sub-title mt-3 text-[var(--brand)]">What the week is asking for.</h2>
+          <div className="mt-8 space-y-4">
+            {weeklyFlow.map((item, index) => (
+              <div key={item.day} className={`soft-card p-5 ${index === 1 ? "studio-accent-card" : ""}`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
+                      {item.day}
+                    </div>
+                    <div className="mt-1 text-lg font-semibold tracking-[-0.03em] text-[var(--brand)]">
+                      {item.title}
+                    </div>
+                  </div>
+                  <span className={`chip ${index === 1 ? "active" : ""}`}>{item.output}</span>
+                </div>
+                <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </section>
+
       <InspirationGallery
         title="Reference atmosphere"
-        copy="A few visual anchors for the week: luminous skies, quiet structure, dramatic weather, and long horizons. The product should stay practical, but the creative mood can stay elevated."
+        copy="The mood is there to sharpen the work, not distract from it: light, order, weather, pressure, and long horizons. Keep the interface useful, then let the references lift the standard."
         artworks={[
           inspirationArtworks[5],
           inspirationArtworks[10],
@@ -86,7 +126,7 @@ export default async function DashboardPage() {
       <section className="grid gap-4 xl:grid-cols-3">
         <div className="app-card p-5 xl:col-span-2">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="sub-title">Up next</h2>
+            <h2 className="sub-title">Scheduled output</h2>
             <Link href="/calendar" className="text-sm font-semibold text-emerald-900">
               Open calendar
             </Link>
@@ -112,7 +152,7 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className="app-card p-5">
-          <h2 className="sub-title">KPI snapshot</h2>
+          <h2 className="sub-title">Performance pulse</h2>
           <div className="mt-4 grid gap-3">
             {(dashboard.kpiSummary.length ? dashboard.kpiSummary : formatSummary)
               .slice(0, 5)

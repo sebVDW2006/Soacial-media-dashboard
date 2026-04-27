@@ -15,6 +15,9 @@ export type ContentFormatBlueprint = {
   examples: string[];
   captureSources: string[];
   weeklySlot: string;
+  voice: string;
+  proofPrompt: string;
+  creativeCue: string;
 };
 
 export const contentFormatBlueprints: ContentFormatBlueprint[] = [
@@ -39,6 +42,9 @@ export const contentFormatBlueprints: ContentFormatBlueprint[] = [
     ],
     captureSources: ["Founder clip", "Proof / problem clip"],
     weeklySlot: "Monday founder authority post",
+    voice: "First-person, direct, humble, earned.",
+    proofPrompt: "Include the specific business situation that forced the lesson out of you.",
+    creativeCue: "Storm light after pressure. Tension resolved into clarity.",
   },
   {
     slug: "raw-build-update",
@@ -61,6 +67,9 @@ export const contentFormatBlueprints: ContentFormatBlueprint[] = [
     ],
     captureSources: ["Founder clip", "Proof / problem clip"],
     weeklySlot: "Stories anytime or Friday optional reel",
+    voice: "Fast, present-tense, unpolished, close to the build.",
+    proofPrompt: "Show exactly what changed this week and what happens next.",
+    creativeCue: "Movement over perfection. Quick glimpses of the workshop.",
   },
   {
     slug: "problem-proof-lesson",
@@ -82,6 +91,9 @@ export const contentFormatBlueprints: ContentFormatBlueprint[] = [
     ],
     captureSources: ["Proof / problem clip", "Founder clip"],
     weeklySlot: "Monday or Thursday trust-building post",
+    voice: "Sober, honest, analytical, grounded in operations.",
+    proofPrompt: "Name the actual friction or failure and why it matters commercially.",
+    creativeCue: "Strong contrast. Raw force meets disciplined explanation.",
   },
   {
     slug: "ublend-experience-demo",
@@ -103,6 +115,9 @@ export const contentFormatBlueprints: ContentFormatBlueprint[] = [
     ],
     captureSources: ["Product sequence", "Photos"],
     weeklySlot: "Friday optional reel or Tuesday visual post",
+    voice: "Crisp, premium, visual-first, outcome-focused.",
+    proofPrompt: "Show the product path clearly enough that a venue buyer understands it instantly.",
+    creativeCue: "Elegant sequence, luminous surfaces, friction removed.",
   },
   {
     slug: "ingredient-truth",
@@ -125,6 +140,9 @@ export const contentFormatBlueprints: ContentFormatBlueprint[] = [
     ],
     captureSources: ["Product sequence", "Photos"],
     weeklySlot: "Tuesday product trust post",
+    voice: "Confident, transparent, simple, educational.",
+    proofPrompt: "Use visible ingredients, weights, or close-up evidence that nothing is hidden.",
+    creativeCue: "Clean daylight. Honest composition. Ingredient-as-subject.",
   },
   {
     slug: "discipline-bridge",
@@ -146,6 +164,9 @@ export const contentFormatBlueprints: ContentFormatBlueprint[] = [
     ],
     captureSources: ["Lifestyle sequence", "Photos"],
     weeklySlot: "Wednesday Seb Instagram",
+    voice: "Disciplined, reflective, energised without performance.",
+    proofPrompt: "Tie the training habit back to food, recovery, and the reason for building.",
+    creativeCue: "Morning stillness with momentum underneath it.",
   },
   {
     slug: "venue-case",
@@ -167,6 +188,9 @@ export const contentFormatBlueprints: ContentFormatBlueprint[] = [
     ],
     captureSources: ["Proof / problem clip", "No filming required"],
     weeklySlot: "Thursday B2B post",
+    voice: "Commercial, clear, persuasive, decision-maker aware.",
+    proofPrompt: "Spell out the venue upside in labour, experience, footfall, or dwell time.",
+    creativeCue: "Architectural order. Structure, utility, and composed thinking.",
   },
   {
     slug: "founder-reflection",
@@ -189,6 +213,9 @@ export const contentFormatBlueprints: ContentFormatBlueprint[] = [
     ],
     captureSources: ["Founder clip", "Lifestyle sequence", "Photos"],
     weeklySlot: "Monday or Wednesday personal reflection",
+    voice: "Still, thoughtful, principled, inward before outward.",
+    proofPrompt: "Anchor the reflection in something that genuinely happened this week.",
+    creativeCue: "Quiet ruins, long horizon, light arriving through shadow.",
   },
 ];
 
