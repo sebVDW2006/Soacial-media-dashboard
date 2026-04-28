@@ -172,6 +172,7 @@ export async function markPosted(formData: FormData) {
 
   revalidatePath(`/content/${contentItemId}`);
   revalidatePath("/pipeline");
+  revalidatePath("/kpis");
   revalidatePath("/");
 }
 

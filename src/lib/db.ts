@@ -86,7 +86,7 @@ export async function touchContentStatus(contentItemId: number) {
   const scheduled = await db.execute({
     sql: `SELECT
         COUNT(*) AS scheduled_count,
-        SUM(CASE WHEN posted_url IS NOT NULL AND posted_url != '' THEN 1 ELSE 0 END) AS posted_count
+        SUM(CASE WHEN status = 'posted' THEN 1 ELSE 0 END) AS posted_count
       FROM content_channels
       WHERE content_item_id = ?`,
     args: [contentItemId],
