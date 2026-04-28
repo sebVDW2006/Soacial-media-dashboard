@@ -79,3 +79,57 @@ export function getWeekTuesday(isoWeek: string) {
   return range.days[1]?.date ?? range.start;
 }
 
+export function getCurrentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function getMonthRange(yearMonth: string) {
+  const [yearStr, monthStr] = yearMonth.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+
+  const firstDay = new Date(Date.UTC(year, month - 1, 1));
+  const lastDay = new Date(Date.UTC(year, month, 0));
+
+  // Start grid on Monday of the week containing the 1st
+  const firstDow = firstDay.getUTCDay() || 7; // 1=Mon … 7=Sun
+  const gridStart = new Date(firstDay);
+  gridStart.setUTCDate(firstDay.getUTCDate() - firstDow + 1);
+
+  // End grid on Sunday of the week containing the last day
+  const lastDow = lastDay.getUTCDay() || 7;
+  const gridEnd = new Date(lastDay);
+  if (lastDow < 7) gridEnd.setUTCDate(lastDay.getUTCDate() + (7 - lastDow));
+
+  const days: Array<{ date: string; dayNum: number; currentMonth: boolean }> = [];
+  const cur = new Date(gridStart);
+  while (cur <= gridEnd) {
+    days.push({
+      date: cur.toISOString().slice(0, 10),
+      dayNum: cur.getUTCDate(),
+      currentMonth: cur.getUTCMonth() === month - 1,
+    });
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+
+  return {
+    start: gridStart.toISOString().slice(0, 10),
+    end: gridEnd.toISOString().slice(0, 10),
+    label: firstDay.toLocaleDateString("en-GB", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }),
+    prevMonth:
+      month === 1
+        ? `${year - 1}-12`
+        : `${year}-${String(month - 1).padStart(2, "0")}`,
+    nextMonth:
+      month === 12
+        ? `${year + 1}-01`
+        : `${year}-${String(month + 1).padStart(2, "0")}`,
+    days,
+  };
+}
+

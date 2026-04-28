@@ -115,6 +115,40 @@ export async function getContentById(id: number) {
   };
 }
 
+export async function getScheduledRange(start: string, end: string) {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT
+        cc.id AS content_channel_id,
+        cc.scheduled_at,
+        ch.brand,
+        ch.name AS channel_name,
+        ch.slug AS channel_slug,
+        ci.id AS content_id,
+        ci.title,
+        ci.status,
+        ci.target_post_at
+      FROM content_channels cc
+      INNER JOIN channels ch ON ch.id = cc.channel_id
+      INNER JOIN content_items ci ON ci.id = cc.content_item_id
+      WHERE substr(COALESCE(cc.scheduled_at, ci.target_post_at, ''), 1, 10) BETWEEN ? AND ?
+      ORDER BY COALESCE(cc.scheduled_at, ci.target_post_at) ASC`,
+    args: [start, end],
+  });
+
+  return result.rows as unknown as Array<{
+    content_channel_id: number;
+    scheduled_at: string | null;
+    brand: Brand;
+    channel_name: string;
+    channel_slug: string;
+    content_id: number;
+    title: string;
+    status: string;
+    target_post_at: string | null;
+  }>;
+}
+
 export async function getScheduledWeek(isoWeek = getCurrentWeek()) {
   const db = await getDb();
   const range = weekRange(isoWeek);
@@ -264,34 +298,37 @@ export async function getWeeklyReview(week: string) {
 export async function getDashboardData() {
   const db = await getDb();
   const week = getCurrentWeek();
-  const currentCapture = await getOrCreateCurrentCaptureSession();
-  const nextPosts = await db.execute({
-    sql: `SELECT
-        cc.id,
-        cc.scheduled_at,
-        ch.name AS channel_name,
-        ci.id AS content_id,
-        ci.title,
-        ci.brand
-      FROM content_channels cc
-      INNER JOIN channels ch ON ch.id = cc.channel_id
-      INNER JOIN content_items ci ON ci.id = cc.content_item_id
-      WHERE COALESCE(cc.scheduled_at, ci.target_post_at) >= datetime('now')
-      ORDER BY COALESCE(cc.scheduled_at, ci.target_post_at) ASC
-      LIMIT 5`,
-    args: [],
-  });
-  const ideaCount = await getIdeaCount();
-  const review = await db.execute({
-    sql: "SELECT id FROM weekly_reviews WHERE week_iso = ?",
-    args: [week],
-  });
 
-  const summaryRows = await getKpiSummaryRows("format", 28);
+  const [currentCapture, nextPostsResult, ideaCount, reviewResult, summaryRows] =
+    await Promise.all([
+      getOrCreateCurrentCaptureSession(),
+      db.execute({
+        sql: `SELECT
+            cc.id,
+            cc.scheduled_at,
+            ch.name AS channel_name,
+            ci.id AS content_id,
+            ci.title,
+            ci.brand
+          FROM content_channels cc
+          INNER JOIN channels ch ON ch.id = cc.channel_id
+          INNER JOIN content_items ci ON ci.id = cc.content_item_id
+          WHERE COALESCE(cc.scheduled_at, ci.target_post_at) >= datetime('now')
+          ORDER BY COALESCE(cc.scheduled_at, ci.target_post_at) ASC
+          LIMIT 5`,
+        args: [],
+      }),
+      getIdeaCount(),
+      db.execute({
+        sql: "SELECT id FROM weekly_reviews WHERE week_iso = ?",
+        args: [week],
+      }),
+      getKpiSummaryRows("format", 28),
+    ]);
 
   return {
     week,
-    nextPosts: nextPosts.rows as unknown as Array<{
+    nextPosts: nextPostsResult.rows as unknown as Array<{
       id: number;
       scheduled_at: string | null;
       channel_name: string;
@@ -301,7 +338,7 @@ export async function getDashboardData() {
     }>,
     ideaCount,
     captureSession: currentCapture,
-    reviewMissing: !review.rows.length,
+    reviewMissing: !reviewResult.rows.length,
     kpiSummary: summaryRows,
   };
 }
@@ -362,6 +399,126 @@ export async function getKpiSummaryRows(groupBy: "format" | "pillar" | "channel"
       dms_or_leads: Number(row.dms_or_leads ?? 0),
     })),
   );
+}
+
+export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT
+        ci.id AS content_id,
+        ci.title,
+        ci.status AS content_status,
+        ci.brand,
+        ci.target_post_at,
+        cc.id AS content_channel_id,
+        cc.scheduled_at,
+        cc.posted_url,
+        cc.status AS channel_status,
+        ch.name AS channel_name
+      FROM content_items ci
+      INNER JOIN content_channels cc ON cc.content_item_id = ci.id
+      INNER JOIN channels ch ON ch.id = cc.channel_id
+      WHERE ci.status IN ('scheduled', 'posted')
+        AND (? IS NULL OR ci.brand = ?)
+      ORDER BY COALESCE(ci.target_post_at, ci.created_at) ASC, ci.id, ch.id`,
+    args: [
+      filterBrand && filterBrand !== "all" ? filterBrand : null,
+      filterBrand && filterBrand !== "all" ? filterBrand : null,
+    ],
+  });
+
+  // Group flat rows into content items with their channels
+  const map = new Map<number, {
+    content_id: number;
+    title: string;
+    content_status: string;
+    brand: Brand;
+    target_post_at: string | null;
+    channels: Array<{
+      content_channel_id: number;
+      channel_name: string;
+      scheduled_at: string | null;
+      posted_url: string | null;
+      channel_status: string;
+    }>;
+  }>();
+
+  for (const row of result.rows) {
+    const id = Number(row.content_id);
+    if (!map.has(id)) {
+      map.set(id, {
+        content_id: id,
+        title: String(row.title ?? ""),
+        content_status: String(row.content_status ?? ""),
+        brand: (row.brand as Brand) ?? "seb",
+        target_post_at: row.target_post_at ? String(row.target_post_at) : null,
+        channels: [],
+      });
+    }
+    map.get(id)!.channels.push({
+      content_channel_id: Number(row.content_channel_id),
+      channel_name: String(row.channel_name ?? ""),
+      scheduled_at: row.scheduled_at ? String(row.scheduled_at) : null,
+      posted_url: row.posted_url ? String(row.posted_url) : null,
+      channel_status: String(row.channel_status ?? ""),
+    });
+  }
+
+  return Array.from(map.values());
+}
+
+export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT
+        ci.id AS content_id,
+        ci.title,
+        ci.brand,
+        cc.id AS content_channel_id,
+        cc.posted_url,
+        ch.name AS channel_name
+      FROM content_items ci
+      INNER JOIN content_channels cc ON cc.content_item_id = ci.id
+      INNER JOIN channels ch ON ch.id = cc.channel_id
+      WHERE ci.status IN ('posted', 'tracked')
+        AND cc.status = 'posted'
+        AND (? IS NULL OR ci.brand = ?)
+      ORDER BY ci.updated_at DESC, ci.id, ch.id`,
+    args: [
+      filterBrand && filterBrand !== "all" ? filterBrand : null,
+      filterBrand && filterBrand !== "all" ? filterBrand : null,
+    ],
+  });
+
+  const map = new Map<number, {
+    content_id: number;
+    title: string;
+    brand: Brand;
+    channels: Array<{
+      content_channel_id: number;
+      channel_name: string;
+      posted_url: string | null;
+    }>;
+  }>();
+
+  for (const row of result.rows) {
+    const id = Number(row.content_id);
+    if (!map.has(id)) {
+      map.set(id, {
+        content_id: id,
+        title: String(row.title ?? ""),
+        brand: (row.brand as Brand) ?? "seb",
+        channels: [],
+      });
+    }
+    map.get(id)!.channels.push({
+      content_channel_id: Number(row.content_channel_id),
+      channel_name: String(row.channel_name ?? ""),
+      posted_url: row.posted_url ? String(row.posted_url) : null,
+    });
+  }
+
+  return Array.from(map.values());
 }
 
 export async function getTopKpiPosts(days = 30) {

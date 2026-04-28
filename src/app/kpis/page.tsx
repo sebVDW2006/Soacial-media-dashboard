@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { KPIBars } from "@/components/KPIBars";
-import { PaintingFeature } from "@/components/PaintingFeature";
-import { featuredInspiration } from "@/lib/inspiration";
-import { getKpiSummaryRows, getTopKpiPosts } from "@/lib/queries";
+import { addKpi } from "@/app/content/actions";
+import { getKpiSummaryRows, getPostedItemsWithChannels, getTopKpiPosts } from "@/lib/queries";
 
 type KpisPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -16,22 +15,23 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       ? (params.groupBy as "format" | "pillar" | "channel" | "brand")
       : "format";
   const range = typeof params.range === "string" ? Number(params.range) : 30;
+  const safeRange = Number.isFinite(range) ? range : 30;
 
-  const [summary, topPosts] = await Promise.all([
-    getKpiSummaryRows(groupBy, Number.isFinite(range) ? range : 30),
-    getTopKpiPosts(Number.isFinite(range) ? range : 30),
+  const [summary, topPosts, postedItems] = await Promise.all([
+    getKpiSummaryRows(groupBy, safeRange),
+    getTopKpiPosts(safeRange),
+    getPostedItemsWithChannels(),
   ]);
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-8 2xl:grid-cols-[1.15fr_0.95fr]">
-        <div className="app-card p-8 sm:p-10 lg:p-12">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 5</p>
-          <h1 className="section-title mt-2">Track data</h1>
-          <p className="muted mt-4 max-w-2xl leading-8">
-            Capture the actual results after posting so you can see what formats, pillars, and channels are working.
-          </p>
-          <form className="mt-8 grid gap-3 md:grid-cols-2">
+      <section className="app-card p-7 sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="section-title">Track data</h1>
+            <p className="muted mt-2 text-sm">Log KPIs for posted content, then see what formats and channels perform best.</p>
+          </div>
+          <form className="flex flex-wrap items-end gap-3">
             <div>
               <label>Group by</label>
               <select name="groupBy" defaultValue={groupBy}>
@@ -43,29 +43,73 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             </div>
             <div>
               <label>Range</label>
-              <select name="range" defaultValue={String(range)}>
-                <option value="30">Last 30 days</option>
-                <option value="14">Last 14 days</option>
+              <select name="range" defaultValue={String(safeRange)}>
                 <option value="7">Last 7 days</option>
+                <option value="14">Last 14 days</option>
+                <option value="30">Last 30 days</option>
                 <option value="60">Last 60 days</option>
               </select>
             </div>
-            <button type="submit" className="secondary-button md:col-span-2">
-              Refresh
-            </button>
+            <button type="submit" className="secondary-button">Apply</button>
           </form>
         </div>
-
-        <PaintingFeature
-          artwork={featuredInspiration.kpis}
-          eyebrow="Page atmosphere"
-          title="Measure force after the drop."
-          copy="The data page should feel analytical, but still alive. This is where the creative decisions meet the real outcome."
-          heightClass="min-h-[420px]"
-          align="top"
-        />
       </section>
 
+      {/* Log KPIs */}
+      {postedItems.length > 0 && (
+        <section className="app-card space-y-4 p-6 sm:p-7">
+          <div>
+            <h2 className="sub-title">Log KPIs</h2>
+            <p className="muted mt-1 text-sm">Enter the numbers from each platform after posting.</p>
+          </div>
+          {postedItems.map((item) => (
+            <div key={item.content_id} className="soft-card space-y-4 p-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <Link href={`/content/${item.content_id}`} className="font-semibold hover:text-[var(--brand)]">
+                  {item.title}
+                </Link>
+                <span className="chip">{item.brand === "seb" ? "Seb" : "uBlend"}</span>
+              </div>
+              {item.channels.map((ch) => (
+                <form
+                  key={ch.content_channel_id}
+                  action={addKpi}
+                  className="space-y-3"
+                >
+                  <input type="hidden" name="content_channel_id" value={ch.content_channel_id} />
+                  <input type="hidden" name="content_item_id" value={item.content_id} />
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                    {ch.channel_name}
+                    {ch.posted_url && (
+                      <a href={ch.posted_url} target="_blank" rel="noreferrer" className="ml-2 normal-case font-normal text-[var(--brand)]">
+                        view post ↗
+                      </a>
+                    )}
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    {[
+                      ["impressions", "Impressions"],
+                      ["likes", "Likes"],
+                      ["comments", "Comments"],
+                      ["shares", "Shares"],
+                      ["follows", "Follows"],
+                      ["dms_or_leads", "DMs / leads"],
+                    ].map(([name, label]) => (
+                      <div key={name}>
+                        <label>{label}</label>
+                        <input name={name} type="number" min="0" defaultValue="0" />
+                      </div>
+                    ))}
+                  </div>
+                  <button type="submit" className="primary-button">Save KPIs</button>
+                </form>
+              ))}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* Charts */}
       <div className="grid gap-4 xl:grid-cols-2">
         <KPIBars title={`Impressions by ${groupBy}`} rows={summary} metric="impressions" />
         <KPIBars title={`Engagement by ${groupBy}`} rows={summary} metric="engagement_rate" />
@@ -78,9 +122,13 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         <div className="mt-4 grid gap-3">
           {topPosts.length ? (
             topPosts.map((post, index) => (
-              <Link key={post.id} href={`/content/${post.id}`} className="soft-card flex items-center justify-between gap-3 p-4">
+              <Link
+                key={post.id}
+                href={`/content/${post.id}`}
+                className="soft-card flex items-center justify-between gap-3 p-4"
+              >
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--ink-soft)]">
                     #{index + 1}
                   </p>
                   <p className="mt-1 font-semibold">{post.title}</p>

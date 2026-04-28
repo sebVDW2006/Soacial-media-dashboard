@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { Kanban } from "@/components/Kanban";
-import { PaintingFeature } from "@/components/PaintingFeature";
 import { moveStatus } from "@/app/pipeline/actions";
-import { featuredInspiration } from "@/lib/inspiration";
-import { getContentItems } from "@/lib/queries";
+import { saveChannelSchedule } from "@/app/content/actions";
+import { getContentItems, getScheduledAndPostedItems } from "@/lib/queries";
 
 type PipelinePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -12,18 +11,21 @@ type PipelinePageProps = {
 export default async function PipelinePage({ searchParams }: PipelinePageProps) {
   const params = (await searchParams) ?? {};
   const brand = typeof params.brand === "string" ? params.brand : "all";
-  const rows = await getContentItems(brand as "all" | "seb" | "ublend");
+
+  const [rows, scheduledItems] = await Promise.all([
+    getContentItems(brand as "all" | "seb" | "ublend"),
+    getScheduledAndPostedItems(brand as "all" | "seb" | "ublend"),
+  ]);
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-8 2xl:grid-cols-[1.15fr_0.95fr]">
-        <div className="app-card p-8 sm:p-10 lg:p-12">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Step 4</p>
-          <h1 className="section-title mt-2">Post flow</h1>
-          <p className="muted mt-4 max-w-2xl leading-8">
-            See where each piece sits between drafting, captured, scheduled, posted, and tracked.
-          </p>
-          <div className="mt-8 flex gap-2">
+      <section className="app-card p-7 sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="section-title">Post flow</h1>
+            <p className="muted mt-2 text-sm">Move pieces through the stages. Mark them posted and update statuses here.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
             {(["all", "seb", "ublend"] as const).map((option) => (
               <Link
                 key={option}
@@ -35,15 +37,6 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
             ))}
           </div>
         </div>
-
-        <PaintingFeature
-          artwork={featuredInspiration.pipeline}
-          eyebrow="Page atmosphere"
-          title="Pressure, movement, and clean stage changes."
-          copy="This page should hold momentum without feeling frantic. You’re just moving each piece to its next honest state."
-          heightClass="min-h-[420px]"
-          align="top"
-        />
       </section>
 
       <Kanban
@@ -59,9 +52,54 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
         brand={brand as "all" | "seb" | "ublend"}
       />
 
-      <section className="app-card p-5">
-        <h2 className="sub-title">Quick status edits</h2>
-        <div className="mt-4 grid gap-3">
+      {scheduledItems.length > 0 && (
+        <section className="app-card space-y-4 p-6 sm:p-7">
+          <div>
+            <h2 className="sub-title">Mark as posted</h2>
+            <p className="muted mt-1 text-sm">For each channel, paste the live URL and hit Mark posted.</p>
+          </div>
+          {scheduledItems.map((item) => (
+            <div key={item.content_id} className="soft-card space-y-3 p-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <Link href={`/content/${item.content_id}`} className="font-semibold hover:text-[var(--brand)]">
+                  {item.title}
+                </Link>
+                <span className="chip">{item.brand === "seb" ? "Seb" : "uBlend"}</span>
+                {item.target_post_at && (
+                  <span className="text-sm text-[var(--ink-soft)]">
+                    {item.target_post_at.slice(0, 10)}
+                  </span>
+                )}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {item.channels.map((ch) => (
+                  <form key={ch.content_channel_id} action={saveChannelSchedule} className="flex flex-col gap-2">
+                    <input type="hidden" name="content_channel_id" value={ch.content_channel_id} />
+                    <input type="hidden" name="content_item_id" value={item.content_id} />
+                    <input type="hidden" name="scheduled_at" value={ch.scheduled_at ?? ""} />
+                    <label className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                      {ch.channel_name}
+                    </label>
+                    <input
+                      name="posted_url"
+                      defaultValue={ch.posted_url ?? ""}
+                      placeholder="https://..."
+                    />
+                    <button type="submit" className={ch.posted_url ? "secondary-button" : "primary-button"}>
+                      {ch.posted_url ? "Update URL" : "Mark posted"}
+                    </button>
+                  </form>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <section className="app-card p-6 sm:p-7">
+        <h2 className="sub-title">Update status</h2>
+        <p className="muted mt-1 mb-4 text-sm">Manually move any piece to a different stage.</p>
+        <div className="grid gap-3">
           {rows.map((row) => (
             <form
               key={row.id}
@@ -71,7 +109,7 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
               <input type="hidden" name="id" value={row.id} />
               <div>
                 <p className="font-semibold">{row.title}</p>
-                <p className="text-sm text-stone-500">
+                <p className="text-sm text-[var(--ink-soft)]">
                   {row.format_name} • {row.pillar_name}
                 </p>
               </div>

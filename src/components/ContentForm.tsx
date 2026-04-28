@@ -93,6 +93,10 @@ export function ContentForm({
 
   const handleBrandChange = (nextBrand: "seb" | "ublend") => {
     setBrand(nextBrand);
+    // Drop any selected channels that don't belong to the new brand
+    setSelectedChannels((prev) =>
+      prev.filter((id) => channels.find((ch) => ch.id === id && ch.brand === nextBrand)),
+    );
     // If the currently selected pillar isn't valid for the new brand, pick the first valid one
     const validSlugs = PILLAR_BRAND_SLUGS[nextBrand];
     const currentPillar = pillars.find((p) => p.id === pillarId);

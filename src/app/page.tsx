@@ -7,11 +7,12 @@ import { featuredInspiration } from "@/lib/inspiration";
 import { getDashboardData, getKpiSummaryRows } from "@/lib/queries";
 
 export default async function DashboardPage() {
-  const dashboard = await getDashboardData();
-  const [formatSummary, pillarSummary] = await Promise.all([
-    getKpiSummaryRows("format", 28),
+  const [dashboard, pillarSummary] = await Promise.all([
+    getDashboardData(),
     getKpiSummaryRows("pillar", 28),
   ]);
+  // formatSummary is already fetched inside getDashboardData — reuse it
+  const formatSummary = dashboard.kpiSummary;
 
   const nextPostDate = dashboard.nextPosts[0]?.scheduled_at ?? null;
   const nextPostDay = nextPostDate
