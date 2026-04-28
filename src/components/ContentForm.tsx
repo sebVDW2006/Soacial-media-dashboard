@@ -57,17 +57,24 @@ export function ContentForm({
     [formats],
   );
 
+  const initialActiveBrand: "seb" | "ublend" = item?.brand ?? initialBrand ?? "seb";
+
   const [formatId, setFormatId] = useState(initialFormatId);
-  const [brand, setBrand] = useState<"seb" | "ublend">(item?.brand ?? initialBrand ?? "seb");
+  const [brand, setBrand] = useState<"seb" | "ublend">(initialActiveBrand);
   const [pillarId, setPillarId] = useState(initialPillarId);
   const [hook, setHook] = useState(item?.hook ?? "");
   const [body, setBody] = useState(item?.body ?? "");
   const [close, setClose] = useState(item?.close ?? "");
-  const [selectedChannels, setSelectedChannels] = useState<number[]>(
-    linkedChannelIds.length
-      ? linkedChannelIds
-      : formatChannelDefaults(formatLookup.get(initialFormatId), channels),
-  );
+  const [selectedChannels, setSelectedChannels] = useState<number[]>(() => {
+    if (linkedChannelIds.length) {
+      // Filter out any channels that don't match the piece's brand — guards against the old cross-brand bug
+      return linkedChannelIds.filter((id) => {
+        const ch = channels.find((c) => c.id === id);
+        return ch?.brand === initialActiveBrand;
+      });
+    }
+    return formatChannelDefaults(formatLookup.get(initialFormatId), channels);
+  });
   // Only show pillars that belong to the selected brand
   const visiblePillars = useMemo(
     () => pillars.filter((p) => PILLAR_BRAND_SLUGS[brand].includes(p.slug)),

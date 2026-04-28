@@ -31,9 +31,11 @@ export function ChannelMultiSelect({
             </button>
           );
         })}
-      {selectedIds.map((id) => (
-        <input key={`selected-${id}`} type="hidden" name="channel_ids" value={id} />
-      ))}
+      {selectedIds
+        .filter((id) => channels.find((ch) => ch.id === id && ch.brand === brand))
+        .map((id) => (
+          <input key={`selected-${id}`} type="hidden" name="channel_ids" value={id} />
+        ))}
     </div>
   );
 }
