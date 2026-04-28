@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ContentForm } from "@/components/ContentForm";
 import { DeleteButton } from "@/components/DeleteButton";
+import { WeeklyPlanSidebar } from "@/components/WeeklyPlanSidebar";
 import { upsertContent } from "@/app/content/actions";
 import { getAssets, getContentById, getReferenceData } from "@/lib/queries";
 
@@ -44,16 +45,19 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
         </div>
       </section>
 
-      <ContentForm
-        action={upsertContent}
-        item={detail.item}
-        linkedChannelIds={detail.channels.map((channel) => channel.channel_id)}
-        linkedAssetIds={detail.assets.map((asset) => asset.id)}
-        formats={formats}
-        pillars={pillars}
-        channels={channels}
-        assets={assets}
-      />
+      <div className="grid gap-6 xl:grid-cols-[1fr_300px] items-start">
+        <ContentForm
+          action={upsertContent}
+          item={detail.item}
+          linkedChannelIds={detail.channels.map((channel) => channel.channel_id)}
+          linkedAssetIds={detail.assets.map((asset) => asset.id)}
+          formats={formats}
+          pillars={pillars}
+          channels={channels}
+          assets={assets}
+        />
+        <WeeklyPlanSidebar />
+      </div>
     </div>
   );
 }

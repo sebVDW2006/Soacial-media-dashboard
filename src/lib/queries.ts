@@ -467,6 +467,29 @@ export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
   return Array.from(map.values());
 }
 
+export async function getWeeklySlotContent(weekIso: string) {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT
+        ci.id,
+        ci.title,
+        ci.status,
+        ch.slug AS channel_slug
+      FROM content_items ci
+      INNER JOIN content_channels cc ON cc.content_item_id = ci.id
+      INNER JOIN channels ch ON ch.id = cc.channel_id
+      WHERE ci.week_iso = ?
+      ORDER BY ci.created_at ASC`,
+    args: [weekIso],
+  });
+  return result.rows as unknown as Array<{
+    id: number;
+    title: string;
+    status: string;
+    channel_slug: string;
+  }>;
+}
+
 export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
   const db = await getDb();
   const result = await db.execute({
