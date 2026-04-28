@@ -71,6 +71,7 @@ export async function upsertContent(formData: FormData) {
   const formatId = parseInteger(formData.get("format_id"));
   const pillarId = parseInteger(formData.get("pillar_id"));
   const brand = parseText(formData.get("brand"));
+  const postType = parseText(formData.get("post_type")) ?? "single-image";
   const hook = parseText(formData.get("hook"));
   const body = parseText(formData.get("body"));
   const close = parseText(formData.get("close"));
@@ -96,17 +97,17 @@ export async function upsertContent(formData: FormData) {
   if (id) {
     await db.execute({
       sql: `UPDATE content_items
-        SET title = ?, format_id = ?, pillar_id = ?, brand = ?, hook = ?, body = ?, close = ?,
+        SET title = ?, format_id = ?, pillar_id = ?, brand = ?, post_type = ?, hook = ?, body = ?, close = ?,
             target_post_at = ?, week_iso = ?, notes = ?, updated_at = datetime('now')
         WHERE id = ?`,
-      args: [title, formatId, pillarId, brand, hook, body, close, targetPostAt, weekIso, notes, id],
+      args: [title, formatId, pillarId, brand, postType, hook, body, close, targetPostAt, weekIso, notes, id],
     });
   } else {
     const result = await db.execute({
       sql: `INSERT INTO content_items
-        (title, format_id, pillar_id, brand, hook, body, close, status, target_post_at, week_iso, notes, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'drafting', ?, ?, ?, datetime('now'), datetime('now'))`,
-      args: [title, formatId, pillarId, brand, hook, body, close, targetPostAt, weekIso, notes],
+        (title, format_id, pillar_id, brand, post_type, hook, body, close, status, target_post_at, week_iso, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'drafting', ?, ?, ?, datetime('now'), datetime('now'))`,
+      args: [title, formatId, pillarId, brand, postType, hook, body, close, targetPostAt, weekIso, notes],
     });
     contentId = Number(result.lastInsertRowid);
   }

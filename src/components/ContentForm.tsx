@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Asset, Channel, ContentItem, Format, Pillar } from "@/lib/types";
+import type { Asset, Channel, ContentItem, Format, Pillar, PostType } from "@/lib/types";
 import { ChannelMultiSelect } from "@/components/ChannelMultiSelect";
 
 // Which pillar slugs are relevant per brand
@@ -26,6 +26,17 @@ function formatChannelDefaults(format: Format | undefined, channels: Channel[]) 
   const preferred = defaultChannelMap[format.slug] ?? [];
   return channels.filter((channel) => preferred.includes(channel.slug)).map((channel) => channel.id);
 }
+
+const POST_TYPE_OPTIONS: { value: PostType; label: string }[] = [
+  { value: "single-image", label: "Single Image" },
+  { value: "carousel", label: "Carousel" },
+  { value: "reel", label: "Reel" },
+  { value: "story", label: "Story" },
+  { value: "short-video", label: "Short Video" },
+  { value: "text-post", label: "Text Post" },
+  { value: "long-video", label: "Long Video" },
+  { value: "document", label: "Document / PDF" },
+];
 
 export function ContentForm({
   action,
@@ -60,6 +71,7 @@ export function ContentForm({
   const initialActiveBrand: "seb" | "ublend" = item?.brand ?? initialBrand ?? "seb";
 
   const [formatId, setFormatId] = useState(initialFormatId);
+  const [postType, setPostType] = useState<PostType>(item?.post_type ?? "single-image");
   const [brand, setBrand] = useState<"seb" | "ublend">(initialActiveBrand);
   const [pillarId, setPillarId] = useState(initialPillarId);
   const [hook, setHook] = useState(item?.hook ?? "");
@@ -137,9 +149,9 @@ export function ContentForm({
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
-            <label htmlFor="format_id">Format</label>
+            <label htmlFor="format_id">Style</label>
             <select
               id="format_id"
               name="format_id"
@@ -148,6 +160,19 @@ export function ContentForm({
             >
               {formats.map((f) => (
                 <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="post_type">Format</label>
+            <select
+              id="post_type"
+              name="post_type"
+              value={postType}
+              onChange={(e) => setPostType(e.target.value as PostType)}
+            >
+              {POST_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
           </div>

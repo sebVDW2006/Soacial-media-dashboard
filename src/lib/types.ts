@@ -58,12 +58,23 @@ export type Idea = {
   created_at: string;
 };
 
+export type PostType =
+  | "single-image"
+  | "carousel"
+  | "reel"
+  | "story"
+  | "short-video"
+  | "text-post"
+  | "long-video"
+  | "document";
+
 export type ContentItem = {
   id: number;
   title: string;
   format_id: number;
   pillar_id: number;
   brand: Brand;
+  post_type: PostType;
   hook: string | null;
   body: string | null;
   close: string | null;

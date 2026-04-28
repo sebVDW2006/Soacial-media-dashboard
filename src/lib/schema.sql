@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS content_items (
   format_id INTEGER NOT NULL REFERENCES formats(id),
   pillar_id INTEGER NOT NULL REFERENCES pillars(id),
   brand TEXT NOT NULL CHECK(brand IN ('seb', 'ublend')),
+  post_type TEXT NOT NULL DEFAULT 'single-image',
   hook TEXT,
   body TEXT,
   close TEXT,

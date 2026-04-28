@@ -53,6 +53,7 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
                   </h3>
                   <p className="text-sm leading-7 text-[var(--ink-soft)]">
                     {row.format_name} • {row.pillar_name}
+                    {row.post_type ? ` • ${row.post_type.replace(/-/g, " ")}` : ""}
                     {row.channel_names ? ` • ${row.channel_names}` : ""}
                   </p>
                   <p className="text-sm text-[var(--ink-soft)]">

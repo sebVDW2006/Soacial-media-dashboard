@@ -35,6 +35,21 @@ async function ensureSchema(client: Client) {
   await client.batch(statements, "write");
 }
 
+// Runs ALTER TABLE migrations for columns added after initial deploy.
+// Each migration is wrapped in try/catch — if the column already exists, it's a no-op.
+async function ensureMigrations(client: Client) {
+  const migrations = [
+    "ALTER TABLE content_items ADD COLUMN post_type TEXT NOT NULL DEFAULT 'single-image'",
+  ];
+  for (const sql of migrations) {
+    try {
+      await client.execute(sql);
+    } catch {
+      // Column already exists — safe to ignore
+    }
+  }
+}
+
 export async function getDb() {
   if (clientInstance && initPromise) {
     return initPromise;
@@ -48,7 +63,9 @@ export async function getDb() {
   }
 
   if (!initPromise) {
-    initPromise = ensureSchema(clientInstance).then(() => clientInstance as Client);
+    initPromise = ensureSchema(clientInstance)
+      .then(() => ensureMigrations(clientInstance as Client))
+      .then(() => clientInstance as Client);
   }
 
   return initPromise;
