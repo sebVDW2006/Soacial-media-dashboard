@@ -476,10 +476,21 @@ export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
         ci.brand,
         cc.id AS content_channel_id,
         cc.posted_url,
-        ch.name AS channel_name
+        ch.name AS channel_name,
+        ks.id AS snapshot_id,
+        ks.impressions,
+        ks.likes,
+        ks.comments,
+        ks.shares,
+        ks.follows,
+        ks.dms_or_leads
       FROM content_items ci
       INNER JOIN content_channels cc ON cc.content_item_id = ci.id
       INNER JOIN channels ch ON ch.id = cc.channel_id
+      LEFT JOIN kpi_snapshots ks ON ks.content_channel_id = cc.id
+        AND ks.captured_at = (
+          SELECT MAX(captured_at) FROM kpi_snapshots WHERE content_channel_id = cc.id
+        )
       WHERE ci.status IN ('posted', 'tracked')
         AND cc.status = 'posted'
         AND (? IS NULL OR ci.brand = ?)
@@ -498,6 +509,13 @@ export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
       content_channel_id: number;
       channel_name: string;
       posted_url: string | null;
+      snapshot_id: number | null;
+      impressions: number;
+      likes: number;
+      comments: number;
+      shares: number;
+      follows: number;
+      dms_or_leads: number;
     }>;
   }>();
 
@@ -515,6 +533,13 @@ export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
       content_channel_id: Number(row.content_channel_id),
       channel_name: String(row.channel_name ?? ""),
       posted_url: row.posted_url ? String(row.posted_url) : null,
+      snapshot_id: row.snapshot_id ? Number(row.snapshot_id) : null,
+      impressions: Number(row.impressions ?? 0),
+      likes: Number(row.likes ?? 0),
+      comments: Number(row.comments ?? 0),
+      shares: Number(row.shares ?? 0),
+      follows: Number(row.follows ?? 0),
+      dms_or_leads: Number(row.dms_or_leads ?? 0),
     });
   }
 

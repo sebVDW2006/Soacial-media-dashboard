@@ -191,39 +191,66 @@ export async function deleteContent(formData: FormData) {
   redirect("/content");
 }
 
-export async function addKpi(formData: FormData) {
+export async function upsertKpi(formData: FormData) {
   const contentChannelId = parseNullableInteger(formData.get("content_channel_id"));
   const contentItemId = parseNullableInteger(formData.get("content_item_id"));
+  const snapshotId = parseNullableInteger(formData.get("snapshot_id"));
 
   if (!contentChannelId || !contentItemId) {
     throw new Error("Channel KPI context is required.");
   }
 
+  const impressions = parseInteger(formData.get("impressions"));
+  const likes = parseInteger(formData.get("likes"));
+  const comments = parseInteger(formData.get("comments"));
+  const shares = parseInteger(formData.get("shares"));
+  const follows = parseInteger(formData.get("follows"));
+  const dmsOrLeads = parseInteger(formData.get("dms_or_leads"));
+
   const db = await getDb();
-  await db.execute({
-    sql: `INSERT INTO kpi_snapshots
-      (content_channel_id, impressions, views, likes, comments, shares, saves, profile_visits, follows, link_clicks, dms_or_leads, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [
-      contentChannelId,
-      parseInteger(formData.get("impressions")),
-      parseInteger(formData.get("views")),
-      parseInteger(formData.get("likes")),
-      parseInteger(formData.get("comments")),
-      parseInteger(formData.get("shares")),
-      parseInteger(formData.get("saves")),
-      parseInteger(formData.get("profile_visits")),
-      parseInteger(formData.get("follows")),
-      parseInteger(formData.get("link_clicks")),
-      parseInteger(formData.get("dms_or_leads")),
-      parseText(formData.get("notes")),
-    ],
-  });
+
+  if (snapshotId) {
+    // Update existing snapshot
+    await db.execute({
+      sql: `UPDATE kpi_snapshots
+        SET impressions = ?, likes = ?, comments = ?, shares = ?, follows = ?, dms_or_leads = ?,
+            captured_at = datetime('now')
+        WHERE id = ?`,
+      args: [impressions, likes, comments, shares, follows, dmsOrLeads, snapshotId],
+    });
+  } else {
+    // Insert first snapshot
+    await db.execute({
+      sql: `INSERT INTO kpi_snapshots
+        (content_channel_id, impressions, likes, comments, shares, follows, dms_or_leads)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [contentChannelId, impressions, likes, comments, shares, follows, dmsOrLeads],
+    });
+  }
 
   await touchContentStatus(contentItemId);
-
   revalidatePath(`/content/${contentItemId}`);
   revalidatePath("/kpis");
   revalidatePath("/");
 }
+
+export async function deleteKpiSnapshot(formData: FormData) {
+  const snapshotId = parseNullableInteger(formData.get("snapshot_id"));
+  const contentItemId = parseNullableInteger(formData.get("content_item_id"));
+
+  if (!snapshotId) throw new Error("Snapshot ID required.");
+
+  const db = await getDb();
+  await db.execute({ sql: "DELETE FROM kpi_snapshots WHERE id = ?", args: [snapshotId] });
+
+  if (contentItemId) {
+    await touchContentStatus(contentItemId);
+    revalidatePath(`/content/${contentItemId}`);
+  }
+  revalidatePath("/kpis");
+  revalidatePath("/");
+}
+
+// Keep old name as alias for backwards compatibility
+export const addKpi = upsertKpi;
 
