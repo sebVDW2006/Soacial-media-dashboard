@@ -1,11 +1,16 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { getWeeklySlotContent } from "@/lib/queries";
-import { getCurrentWeek, weekRange } from "@/lib/week";
+import { getCurrentWeek, getISOWeek, weekRange } from "@/lib/week";
 
 type Slot = {
   day: string;
+  brand: "seb" | "ublend";
   channelSlug: string;
   channelName: string;
+  formatSlug: string;
+  pillarSlug: string;
+  postType: string;
   style: string;
   format: string;
   purpose: string;
@@ -15,40 +20,60 @@ type Slot = {
 const WEEKLY_SLOTS: Slot[] = [
   {
     day: "Mon",
+    brand: "seb",
     channelSlug: "seb_linkedin",
     channelName: "Seb LinkedIn",
+    formatSlug: "founder-lesson",
+    pillarSlug: "startup-journey",
+    postType: "text-post",
     style: "Founder Lesson",
     format: "Text post",
     purpose: "Build founder authority",
   },
   {
     day: "Tue",
+    brand: "ublend",
     channelSlug: "ublend_instagram",
     channelName: "uBlend Instagram",
+    formatSlug: "ingredient-truth",
+    pillarSlug: "healthy-eating",
+    postType: "carousel",
     style: "Ingredient Truth / Product Proof",
     format: "Photo or Carousel",
     purpose: "Build product trust",
   },
   {
     day: "Wed",
+    brand: "seb",
     channelSlug: "seb_instagram",
     channelName: "Seb Instagram",
+    formatSlug: "discipline-bridge",
+    pillarSlug: "discipline-lifestyle",
+    postType: "story",
     style: "Discipline Bridge or Founder Reflection",
     format: "Photo or Story stack",
     purpose: "Build personal connection",
   },
   {
     day: "Thu",
+    brand: "ublend",
     channelSlug: "ublend_linkedin",
     channelName: "uBlend LinkedIn",
+    formatSlug: "venue-case",
+    pillarSlug: "b2b-experience",
+    postType: "text-post",
     style: "Venue Case Post",
     format: "Text post",
     purpose: "Attract venues and gyms",
   },
   {
     day: "Fri",
+    brand: "ublend",
     channelSlug: "tiktok",
     channelName: "Reel / TikTok / Shorts",
+    formatSlug: "ublend-experience-demo",
+    pillarSlug: "b2b-experience",
+    postType: "short-video",
     style: "Experience Demo or Raw Build Update",
     format: "Short video",
     purpose: "Reach new people",
@@ -65,8 +90,15 @@ const STATUS_COLOR: Record<string, string> = {
   idea: "text-amber-600",
 };
 
-export async function WeeklyPlanSidebar() {
-  const week = getCurrentWeek();
+export async function WeeklyPlanSidebar({
+  weekIso,
+  date,
+}: {
+  weekIso?: string;
+  date?: string | null;
+}) {
+  noStore();
+  const week = weekIso ?? (date ? getISOWeek(date) : getCurrentWeek());
   const range = weekRange(week);
   const items = await getWeeklySlotContent(week);
 
@@ -106,6 +138,16 @@ export async function WeeklyPlanSidebar() {
         {WEEKLY_SLOTS.map((slot) => {
           const slotItems = byChannel.get(slot.channelSlug) ?? [];
           const isDone = slotItems.length > 0;
+          const dayIndex = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(slot.day);
+          const slotDate = range.days[dayIndex]?.date ?? "";
+          const createParams = new URLSearchParams({
+            brand: slot.brand,
+            channel: slot.channelSlug,
+            date: slotDate,
+            format: slot.formatSlug,
+            pillar: slot.pillarSlug,
+            postType: slot.postType,
+          });
 
           return (
             <div
@@ -168,7 +210,7 @@ export async function WeeklyPlanSidebar() {
               {!isDone && (
                 <div className="mt-2 pl-11">
                   <Link
-                    href={`/content/new?date=${range.days[["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(slot.day)]?.date ?? ""}`}
+                    href={`/content/new?${createParams.toString()}`}
                     className="text-[0.65rem] font-semibold text-[var(--brand)] hover:underline"
                   >
                     + Create this piece

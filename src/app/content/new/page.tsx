@@ -2,6 +2,8 @@ import { ContentForm } from "@/components/ContentForm";
 import { WeeklyPlanSidebar } from "@/components/WeeklyPlanSidebar";
 import { upsertContent } from "@/app/content/actions";
 import { getAssets, getReferenceData } from "@/lib/queries";
+import type { PostType } from "@/lib/types";
+import { getISOWeek } from "@/lib/week";
 
 type NewContentPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -18,6 +20,21 @@ export default async function NewContentPage({ searchParams }: NewContentPagePro
   const initialDate = typeof params.date === "string" ? params.date : undefined;
   const { formats, pillars, channels } = await getReferenceData();
   const assets = await getAssets();
+  const initialFormatId =
+    typeof params.format === "string"
+      ? formats.find((format) => format.slug === params.format)?.id
+      : undefined;
+  const initialPillarId =
+    typeof params.pillar === "string"
+      ? pillars.find((pillar) => pillar.slug === params.pillar)?.id
+      : undefined;
+  const initialChannelIds =
+    typeof params.channel === "string"
+      ? channels.filter((channel) => channel.slug === params.channel).map((channel) => channel.id)
+      : [];
+  const initialPostType =
+    typeof params.postType === "string" ? (params.postType as PostType) : undefined;
+  const initialWeekIso = initialDate ? getISOWeek(initialDate) : undefined;
 
   return (
     <div className="space-y-6">
@@ -38,9 +55,13 @@ export default async function NewContentPage({ searchParams }: NewContentPagePro
           channels={channels}
           assets={assets}
           initialBrand={initialBrand}
+          initialFormatId={initialFormatId}
+          initialPillarId={initialPillarId}
+          initialChannelIds={initialChannelIds}
+          initialPostType={initialPostType}
           initialTargetPostAt={defaultTarget(initialDate)}
         />
-        <WeeklyPlanSidebar />
+        <WeeklyPlanSidebar weekIso={initialWeekIso} date={initialDate} />
       </div>
     </div>
   );

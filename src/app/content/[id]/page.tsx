@@ -4,6 +4,7 @@ import { DeleteButton } from "@/components/DeleteButton";
 import { WeeklyPlanSidebar } from "@/components/WeeklyPlanSidebar";
 import { upsertContent } from "@/app/content/actions";
 import { getAssets, getContentById, getReferenceData } from "@/lib/queries";
+import { getISOWeek } from "@/lib/week";
 
 type ContentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -29,6 +30,7 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
 
   const { formats, pillars, channels } = await getReferenceData();
   const assets = await getAssets();
+  const sidebarWeek = detail.item.week_iso ?? (detail.item.target_post_at ? getISOWeek(detail.item.target_post_at) : undefined);
 
   return (
     <div className="space-y-6">
@@ -56,7 +58,7 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
           channels={channels}
           assets={assets}
         />
-        <WeeklyPlanSidebar />
+        <WeeklyPlanSidebar weekIso={sidebarWeek} date={detail.item.target_post_at} />
       </div>
     </div>
   );

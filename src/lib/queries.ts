@@ -469,6 +469,7 @@ export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
 
 export async function getWeeklySlotContent(weekIso: string) {
   const db = await getDb();
+  const range = weekRange(weekIso);
   const result = await db.execute({
     sql: `SELECT
         ci.id,
@@ -478,9 +479,21 @@ export async function getWeeklySlotContent(weekIso: string) {
       FROM content_items ci
       INNER JOIN content_channels cc ON cc.content_item_id = ci.id
       INNER JOIN channels ch ON ch.id = cc.channel_id
-      WHERE ci.week_iso = ?
+      WHERE (
+          ci.target_post_at IS NOT NULL
+          AND substr(ci.target_post_at, 1, 10) BETWEEN ? AND ?
+        )
+        OR (
+          ci.target_post_at IS NULL
+          AND ci.week_iso = ?
+        )
+        OR (
+          ci.target_post_at IS NULL
+          AND ci.week_iso IS NULL
+          AND substr(COALESCE(ci.updated_at, ci.created_at, ''), 1, 10) BETWEEN ? AND ?
+        )
       ORDER BY ci.created_at ASC`,
-    args: [weekIso],
+    args: [range.start, range.end, weekIso, range.start, range.end],
   });
   return result.rows as unknown as Array<{
     id: number;

@@ -48,6 +48,10 @@ export function ContentForm({
   channels,
   assets,
   initialBrand,
+  initialFormatId,
+  initialPillarId,
+  initialChannelIds,
+  initialPostType,
   initialTargetPostAt,
 }: {
   action: (formData: FormData) => Promise<void>;
@@ -59,10 +63,14 @@ export function ContentForm({
   channels: Channel[];
   assets: Asset[];
   initialBrand?: "seb" | "ublend";
+  initialFormatId?: number;
+  initialPillarId?: number;
+  initialChannelIds?: number[];
+  initialPostType?: PostType;
   initialTargetPostAt?: string | null;
 }) {
-  const initialFormatId = item?.format_id ?? formats[0]?.id ?? 1;
-  const initialPillarId = item?.pillar_id ?? pillars[0]?.id ?? 1;
+  const activeFormatId = item?.format_id ?? initialFormatId ?? formats[0]?.id ?? 1;
+  const activePillarId = item?.pillar_id ?? initialPillarId ?? pillars[0]?.id ?? 1;
   const formatLookup = useMemo(
     () => new Map(formats.map((format) => [format.id, format])),
     [formats],
@@ -70,10 +78,10 @@ export function ContentForm({
 
   const initialActiveBrand: "seb" | "ublend" = item?.brand ?? initialBrand ?? "seb";
 
-  const [formatId, setFormatId] = useState(initialFormatId);
-  const [postType, setPostType] = useState<PostType>(item?.post_type ?? "single-image");
+  const [formatId, setFormatId] = useState(activeFormatId);
+  const [postType, setPostType] = useState<PostType>(item?.post_type ?? initialPostType ?? "single-image");
   const [brand, setBrand] = useState<"seb" | "ublend">(initialActiveBrand);
-  const [pillarId, setPillarId] = useState(initialPillarId);
+  const [pillarId, setPillarId] = useState(activePillarId);
   const [hook, setHook] = useState(item?.hook ?? "");
   const [body, setBody] = useState(item?.body ?? "");
   const [close, setClose] = useState(item?.close ?? "");
@@ -85,7 +93,13 @@ export function ContentForm({
         return ch?.brand === initialActiveBrand;
       });
     }
-    return formatChannelDefaults(formatLookup.get(initialFormatId), channels);
+    if (initialChannelIds?.length) {
+      return initialChannelIds.filter((id) => {
+        const ch = channels.find((channel) => channel.id === id);
+        return ch?.brand === initialActiveBrand;
+      });
+    }
+    return formatChannelDefaults(formatLookup.get(activeFormatId), channels);
   });
   // Only show pillars that belong to the selected brand
   const visiblePillars = useMemo(

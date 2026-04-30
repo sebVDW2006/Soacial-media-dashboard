@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb, parseInteger, parseNullableInteger, parseText, touchContentStatus } from "@/lib/db";
-import { getISOWeek } from "@/lib/week";
+import { getCurrentWeek, getISOWeek } from "@/lib/week";
 
 async function syncContentChannels(contentItemId: number, channelIds: number[]) {
   const db = await getDb();
@@ -90,9 +90,19 @@ export async function upsertContent(formData: FormData) {
     throw new Error("Missing required content fields.");
   }
 
-  const weekIso = targetPostAt ? getISOWeek(targetPostAt) : null;
   const db = await getDb();
   let contentId = id ?? 0;
+  let existingWeekIso: string | null = null;
+
+  if (id) {
+    const existing = await db.execute({
+      sql: "SELECT week_iso FROM content_items WHERE id = ?",
+      args: [id],
+    });
+    existingWeekIso = (existing.rows[0]?.week_iso as string | null) ?? null;
+  }
+
+  const weekIso = targetPostAt ? getISOWeek(targetPostAt) : existingWeekIso ?? getCurrentWeek();
 
   if (id) {
     await db.execute({
@@ -117,6 +127,8 @@ export async function upsertContent(formData: FormData) {
   await touchContentStatus(contentId);
 
   revalidatePath("/");
+  revalidatePath("/content");
+  revalidatePath("/content/new");
   revalidatePath("/calendar");
   revalidatePath("/pipeline");
   revalidatePath(`/content/${contentId}`);
@@ -147,6 +159,8 @@ export async function saveChannelSchedule(formData: FormData) {
   await touchContentStatus(contentItemId);
 
   revalidatePath(`/content/${contentItemId}`);
+  revalidatePath("/content");
+  revalidatePath("/content/new");
   revalidatePath("/calendar");
   revalidatePath("/pipeline");
   revalidatePath("/");
@@ -185,6 +199,7 @@ export async function deleteContent(formData: FormData) {
   await db.execute({ sql: "DELETE FROM content_items WHERE id = ?", args: [id] });
 
   revalidatePath("/content");
+  revalidatePath("/content/new");
   revalidatePath("/pipeline");
   revalidatePath("/calendar");
   revalidatePath("/");
@@ -206,8 +221,17 @@ export async function upsertKpi(formData: FormData) {
   const shares = parseInteger(formData.get("shares"));
   const follows = parseInteger(formData.get("follows"));
   const dmsOrLeads = parseInteger(formData.get("dms_or_leads"));
+  const postedUrl = parseText(formData.get("posted_url"));
 
   const db = await getDb();
+
+  // Save the post URL to the channel row if provided
+  if (postedUrl !== null) {
+    await db.execute({
+      sql: "UPDATE content_channels SET posted_url = ? WHERE id = ?",
+      args: [postedUrl, contentChannelId],
+    });
+  }
 
   if (snapshotId) {
     // Update existing snapshot
@@ -230,6 +254,7 @@ export async function upsertKpi(formData: FormData) {
 
   await touchContentStatus(contentItemId);
   revalidatePath(`/content/${contentItemId}`);
+  revalidatePath("/pipeline");
   revalidatePath("/kpis");
   revalidatePath("/");
 }
@@ -253,4 +278,3 @@ export async function deleteKpiSnapshot(formData: FormData) {
 
 // Keep old name as alias for backwards compatibility
 export const addKpi = upsertKpi;
-
