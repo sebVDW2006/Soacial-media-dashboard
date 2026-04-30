@@ -51,7 +51,7 @@ export function Nav() {
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-6 py-5 lg:px-10">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <Link href="/" className="text-[2rem] font-semibold tracking-[-0.08em] text-[var(--brand)]">
-            Content OS
+            Content Dashboard
           </Link>
 
           <div className="flex flex-wrap items-center gap-3 rounded-full border border-[var(--line)] bg-white/70 p-2 shadow-sm">

@@ -14,7 +14,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
             Single-user access
           </p>
-          <h1 className="section-title mt-3">Unlock Content OS</h1>
+          <h1 className="section-title mt-3">Unlock Content Dashboard</h1>
           <p className="muted mt-4 text-base">
             Enter the password set in `CONTENT_OS_PASSWORD` to open the content system.
           </p>
@@ -38,4 +38,3 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     </div>
   );
 }
-

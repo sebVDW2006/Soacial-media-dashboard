@@ -4,8 +4,22 @@ import "./globals.css";
 import { Nav } from "@/components/Nav";
 
 export const metadata: Metadata = {
-  title: "Content OS",
+  title: "Content Dashboard",
   description: "A central content management system for Seb and uBlend",
+  applicationName: "Content Dashboard",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Content Dashboard",
+  },
+  icons: {
+    apple: "/icons/icon-192.png",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
 };
 
 export const dynamic = "force-dynamic";
@@ -23,6 +37,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+      </head>
       <body>
         <div className="page-shell">
           <Suspense
@@ -30,7 +47,7 @@ export default function RootLayout({
               <header className="top-nav">
                 <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-6 px-6 py-5 lg:px-10">
                   <span className="text-[1.85rem] font-semibold tracking-[-0.08em] text-[var(--brand)]">
-                    Content OS
+                    Content Dashboard
                   </span>
                 </div>
               </header>
