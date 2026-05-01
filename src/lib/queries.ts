@@ -15,6 +15,22 @@ import type {
   WeeklyReview,
 } from "@/lib/types";
 
+type RowsResult = {
+  rows: unknown[];
+};
+
+function rowsAs<T>(result: RowsResult) {
+  return result.rows as unknown as T[];
+}
+
+function firstRowAs<T>(result: RowsResult) {
+  return rowsAs<T>(result)[0];
+}
+
+function normalizeBrandFilter(filterBrand?: Brand | "all") {
+  return filterBrand && filterBrand !== "all" ? filterBrand : null;
+}
+
 export async function getReferenceData() {
   const db = await getDb();
   const [pillars, formats, channels] = await Promise.all([
@@ -24,9 +40,9 @@ export async function getReferenceData() {
   ]);
 
   return {
-    pillars: pillars.rows as unknown as Pillar[],
-    formats: formats.rows as unknown as Format[],
-    channels: channels.rows as unknown as Channel[],
+    pillars: rowsAs<Pillar>(pillars),
+    formats: rowsAs<Format>(formats),
+    channels: rowsAs<Channel>(channels),
   };
 }
 
@@ -50,7 +66,7 @@ export async function getIdeas(filterBrand?: Brand | "all") {
       ORDER BY i.created_at DESC`,
     args: filterBrand && filterBrand !== "all" ? [filterBrand] : [],
   });
-  return result.rows as unknown as Array<Idea & { format_name?: string | null }>;
+  return rowsAs<Idea & { format_name?: string | null }>(result);
 }
 
 export async function getIdeaCount() {
@@ -61,6 +77,7 @@ export async function getIdeaCount() {
 
 export async function getContentItems(filterBrand?: Brand | "all") {
   const db = await getDb();
+  const brand = normalizeBrandFilter(filterBrand);
   const result = await db.execute({
     sql: `SELECT ci.*, f.name AS format_name, p.name AS pillar_name,
         GROUP_CONCAT(ch.name, ', ') AS channel_names
@@ -72,9 +89,9 @@ export async function getContentItems(filterBrand?: Brand | "all") {
       WHERE (? IS NULL OR ci.brand = ?)
       GROUP BY ci.id
       ORDER BY COALESCE(ci.target_post_at, ci.created_at) ASC`,
-    args: [filterBrand && filterBrand !== "all" ? filterBrand : null, filterBrand && filterBrand !== "all" ? filterBrand : null],
+    args: [brand, brand],
   });
-  return result.rows as unknown as ContentListItem[];
+  return rowsAs<ContentListItem>(result);
 }
 
 export async function getContentById(id: number) {
@@ -83,7 +100,7 @@ export async function getContentById(id: number) {
     sql: "SELECT * FROM content_items WHERE id = ?",
     args: [id],
   });
-  const item = content.rows[0] as unknown as ContentItem | undefined;
+  const item = firstRowAs<ContentItem>(content);
 
   if (!item) {
     return null;
@@ -110,8 +127,8 @@ export async function getContentById(id: number) {
 
   return {
     item,
-    channels: channels.rows as unknown as ContentChannelDetail[],
-    assets: assets.rows as unknown as Asset[],
+    channels: rowsAs<ContentChannelDetail>(channels),
+    assets: rowsAs<Asset>(assets),
   };
 }
 
@@ -136,7 +153,7 @@ export async function getScheduledRange(start: string, end: string) {
     args: [start, end],
   });
 
-  return result.rows as unknown as Array<{
+  return rowsAs<{
     content_channel_id: number;
     scheduled_at: string | null;
     brand: Brand;
@@ -146,7 +163,7 @@ export async function getScheduledRange(start: string, end: string) {
     title: string;
     status: string;
     target_post_at: string | null;
-  }>;
+  }>(result);
 }
 
 export async function getScheduledWeek(isoWeek = getCurrentWeek()) {
@@ -173,7 +190,7 @@ export async function getScheduledWeek(isoWeek = getCurrentWeek()) {
 
   return {
     range,
-    rows: result.rows as unknown as Array<{
+    rows: rowsAs<{
       content_channel_id: number;
       scheduled_at: string | null;
       brand: Brand;
@@ -183,28 +200,29 @@ export async function getScheduledWeek(isoWeek = getCurrentWeek()) {
       title: string;
       status: string;
       target_post_at: string | null;
-    }>,
+    }>(result),
   };
 }
 
 export async function getCaptureSessionById(id: number) {
   const db = await getDb();
-  const session = await db.execute({
-    sql: "SELECT * FROM capture_sessions WHERE id = ?",
-    args: [id],
-  });
-  const row = session.rows[0] as unknown as CaptureSession | undefined;
+  const [session, assets] = await Promise.all([
+    db.execute({
+      sql: "SELECT * FROM capture_sessions WHERE id = ?",
+      args: [id],
+    }),
+    db.execute({
+      sql: "SELECT * FROM assets WHERE capture_session_id = ? ORDER BY created_at DESC",
+      args: [id],
+    }),
+  ]);
+  const row = firstRowAs<CaptureSession>(session);
 
   if (!row) return null;
 
-  const assets = await db.execute({
-    sql: "SELECT * FROM assets WHERE capture_session_id = ? ORDER BY created_at DESC",
-    args: [id],
-  });
-
   return {
     session: row,
-    assets: assets.rows as unknown as Asset[],
+    assets: rowsAs<Asset>(assets),
   };
 }
 
@@ -224,7 +242,7 @@ export async function getOrCreateCurrentCaptureSession() {
     args: [captureDate],
   });
 
-  return result.rows[0] as unknown as CaptureSession;
+  return firstRowAs<CaptureSession>(result) as CaptureSession;
 }
 
 export async function getAssets(filters?: {
@@ -269,29 +287,31 @@ export async function getAssets(filters?: {
     args,
   });
 
-  return result.rows as unknown as Array<Asset & { linked_content_titles?: string | null }>;
+  return rowsAs<Asset & { linked_content_titles?: string | null }>(result);
 }
 
 export async function getWeeklyReviews() {
   const db = await getDb();
   const result = await db.execute("SELECT * FROM weekly_reviews ORDER BY week_iso DESC");
-  return result.rows as unknown as WeeklyReview[];
+  return rowsAs<WeeklyReview>(result);
 }
 
 export async function getWeeklyReview(week: string) {
   const db = await getDb();
-  const review = await db.execute({
-    sql: "SELECT * FROM weekly_reviews WHERE week_iso = ?",
-    args: [week],
-  });
-  const content = await db.execute({
-    sql: "SELECT id, title FROM content_items WHERE week_iso = ? ORDER BY target_post_at",
-    args: [week],
-  });
+  const [review, content] = await Promise.all([
+    db.execute({
+      sql: "SELECT * FROM weekly_reviews WHERE week_iso = ?",
+      args: [week],
+    }),
+    db.execute({
+      sql: "SELECT id, title FROM content_items WHERE week_iso = ? ORDER BY target_post_at",
+      args: [week],
+    }),
+  ]);
 
   return {
-    review: (review.rows[0] as unknown as WeeklyReview | undefined) ?? null,
-    content: content.rows as unknown as Array<{ id: number; title: string }>,
+    review: firstRowAs<WeeklyReview>(review) ?? null,
+    content: rowsAs<{ id: number; title: string }>(content),
   };
 }
 
@@ -328,14 +348,14 @@ export async function getDashboardData() {
 
   return {
     week,
-    nextPosts: nextPostsResult.rows as unknown as Array<{
+    nextPosts: rowsAs<{
       id: number;
       scheduled_at: string | null;
       channel_name: string;
       content_id: number;
       title: string;
       brand: Brand;
-    }>,
+    }>(nextPostsResult),
     ideaCount,
     captureSession: currentCapture,
     reviewMissing: !reviewResult.rows.length,
@@ -403,6 +423,7 @@ export async function getKpiSummaryRows(groupBy: "format" | "pillar" | "channel"
 
 export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
   const db = await getDb();
+  const brand = normalizeBrandFilter(filterBrand);
   const result = await db.execute({
     sql: `SELECT
         ci.id AS content_id,
@@ -421,10 +442,7 @@ export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
       WHERE ci.status IN ('scheduled', 'posted')
         AND (? IS NULL OR ci.brand = ?)
       ORDER BY COALESCE(ci.target_post_at, ci.created_at) ASC, ci.id, ch.id`,
-    args: [
-      filterBrand && filterBrand !== "all" ? filterBrand : null,
-      filterBrand && filterBrand !== "all" ? filterBrand : null,
-    ],
+    args: [brand, brand],
   });
 
   // Group flat rows into content items with their channels
@@ -495,16 +513,17 @@ export async function getWeeklySlotContent(weekIso: string) {
       ORDER BY ci.created_at ASC`,
     args: [range.start, range.end, weekIso, range.start, range.end],
   });
-  return result.rows as unknown as Array<{
+  return rowsAs<{
     id: number;
     title: string;
     status: string;
     channel_slug: string;
-  }>;
+  }>(result);
 }
 
 export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
   const db = await getDb();
+  const brand = normalizeBrandFilter(filterBrand);
   const result = await db.execute({
     sql: `SELECT
         ci.id AS content_id,
@@ -531,10 +550,7 @@ export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
         AND cc.status = 'posted'
         AND (? IS NULL OR ci.brand = ?)
       ORDER BY ci.updated_at DESC, ci.id, ch.id`,
-    args: [
-      filterBrand && filterBrand !== "all" ? filterBrand : null,
-      filterBrand && filterBrand !== "all" ? filterBrand : null,
-    ],
+    args: [brand, brand],
   });
 
   const map = new Map<number, {
@@ -609,9 +625,9 @@ export async function getTopKpiPosts(days = 30) {
       LIMIT 10`,
     args: [`-${days} days`],
   });
-  return result.rows as unknown as Array<{
+  return rowsAs<{
     id: number;
     title: string;
     total_engagement: number;
-  }>;
+  }>(result);
 }
