@@ -138,8 +138,6 @@
   }
 
   button[type="submit"],
-  .btn-primary,
-  .btn-secondary,
   .primary-button,
   .secondary-button {
     display: inline-flex;
@@ -156,7 +154,6 @@
   }
 
   button[type="submit"],
-  .btn-primary,
   .primary-button {
     background: linear-gradient(180deg, #1a1f1c 0%, #0f1211 100%);
     border-color: rgba(9, 11, 10, 0.4);
@@ -165,20 +162,17 @@
   }
 
   button[type="submit"]:hover,
-  .btn-primary:hover,
   .primary-button:hover {
     transform: translateY(-1px);
     box-shadow: 0 14px 30px rgba(9, 11, 10, 0.2);
   }
 
-  .btn-secondary,
   .secondary-button {
     background: rgba(255, 255, 255, 0.86);
     border-color: var(--line);
     color: var(--ink);
   }
 
-  .btn-secondary:hover,
   .secondary-button:hover {
     transform: translateY(-1px);
     border-color: var(--line-strong);

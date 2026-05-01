@@ -219,10 +219,6 @@ export const contentFormatBlueprints: ContentFormatBlueprint[] = [
   },
 ];
 
-export const blueprintBySlug = Object.fromEntries(
-  contentFormatBlueprints.map((blueprint) => [blueprint.slug, blueprint]),
-) as Record<string, ContentFormatBlueprint>;
-
 export const weeklyFlow = [
   {
     day: "Monday",
