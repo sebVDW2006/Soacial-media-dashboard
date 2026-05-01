@@ -5,28 +5,114 @@ import { redirect } from "next/navigation";
 import { getDb, parseInteger, parseNullableInteger, parseText, touchContentStatus } from "@/lib/db";
 import { getCurrentWeek, getISOWeek } from "@/lib/week";
 
-async function syncContentChannels(contentItemId: number, channelIds: number[]) {
-  const db = await getDb();
-  const existing = await db.execute({
-    sql: "SELECT id, channel_id FROM content_channels WHERE content_item_id = ?",
-    args: [contentItemId],
-  });
-  const existingIds = new Set(existing.rows.map((row) => Number(row.channel_id)));
+const CONTENT_COLLECTION_PATHS = ["/", "/content", "/content/new", "/calendar", "/pipeline"] as const;
+const KPI_PATHS = ["/", "/pipeline", "/kpis"] as const;
 
-  for (const channelId of channelIds) {
-    if (!existingIds.has(channelId)) {
-      await db.execute({
-        sql: `INSERT OR IGNORE INTO content_channels
-          (content_item_id, channel_id, status)
-          VALUES (?, ?, 'planned')`,
-        args: [contentItemId, channelId],
-      });
-    }
+function getEarliestDate(values: Array<string | null>) {
+  const valid = values.filter((value): value is string => Boolean(value));
+  if (!valid.length) return null;
+  return valid.reduce((earliest, current) => (current < earliest ? current : earliest));
+}
+
+function getSelectedIds(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+}
+
+function getChannelStatus({
+  scheduledAt,
+  postedAt,
+  postedUrl,
+  existingStatus,
+}: {
+  scheduledAt?: string | null;
+  postedAt?: string | null;
+  postedUrl?: string | null;
+  existingStatus?: string | null;
+}) {
+  if (existingStatus === "posted" || postedAt || postedUrl) {
+    return "posted";
   }
 
+  return scheduledAt ? "scheduled" : "planned";
+}
+
+function revalidatePaths(paths: readonly string[]) {
+  for (const path of paths) {
+    revalidatePath(path);
+  }
+}
+
+function revalidateContentRoutes(contentItemId: number) {
+  revalidatePath(`/content/${contentItemId}`);
+  revalidatePaths(CONTENT_COLLECTION_PATHS);
+}
+
+function revalidateKpiRoutes(contentItemId?: number | null) {
+  if (contentItemId) {
+    revalidatePath(`/content/${contentItemId}`);
+  }
+
+  revalidatePaths(KPI_PATHS);
+}
+
+async function syncContentChannels(
+  contentItemId: number,
+  channelIds: number[],
+  channelSchedules: Record<number, string | null>,
+) {
+  const db = await getDb();
+  const existing = await db.execute({
+    sql: `SELECT id, channel_id, posted_at, posted_url, status
+      FROM content_channels
+      WHERE content_item_id = ?`,
+    args: [contentItemId],
+  });
+  const existingByChannelId = new Map(
+    existing.rows.map((row) => [
+      Number(row.channel_id),
+      {
+        id: Number(row.id),
+        posted_at: row.posted_at ? String(row.posted_at) : null,
+        posted_url: row.posted_url ? String(row.posted_url) : null,
+        status: String(row.status ?? "planned"),
+      },
+    ]),
+  );
+  const nextChannelIds = new Set(channelIds);
   const toDelete = existing.rows
-    .filter((row) => !channelIds.includes(Number(row.channel_id)))
+    .filter((row) => !nextChannelIds.has(Number(row.channel_id)))
     .map((row) => Number(row.id));
+
+  for (const channelId of channelIds) {
+    const scheduledAt = channelSchedules[channelId] ?? null;
+    const existingRow = existingByChannelId.get(channelId);
+    const status = getChannelStatus({
+      scheduledAt,
+      postedAt: existingRow?.posted_at,
+      postedUrl: existingRow?.posted_url,
+      existingStatus: existingRow?.status,
+    });
+
+    if (!existingRow) {
+      await db.execute({
+        sql: `INSERT OR IGNORE INTO content_channels
+          (content_item_id, channel_id, scheduled_at, status)
+          VALUES (?, ?, ?, ?)`,
+        args: [contentItemId, channelId, scheduledAt, status],
+      });
+      continue;
+    }
+
+    await db.execute({
+      sql: `UPDATE content_channels
+        SET scheduled_at = ?, status = ?
+        WHERE id = ?`,
+      args: [scheduledAt, status, existingRow.id],
+    });
+  }
 
   for (const id of toDelete) {
     await db.execute({
@@ -43,6 +129,7 @@ async function syncAssets(contentItemId: number, assetIds: number[]) {
     args: [contentItemId],
   });
   const existingIds = new Set(existing.rows.map((row) => Number(row.asset_id)));
+  const nextAssetIds = new Set(assetIds);
 
   for (const assetId of assetIds) {
     if (!existingIds.has(assetId)) {
@@ -54,9 +141,8 @@ async function syncAssets(contentItemId: number, assetIds: number[]) {
     }
   }
 
-  for (const row of existing.rows) {
-    const assetId = Number(row.asset_id);
-    if (!assetIds.includes(assetId)) {
+  for (const assetId of existing.rows.map((row) => Number(row.asset_id))) {
+    if (!nextAssetIds.has(assetId)) {
       await db.execute({
         sql: "DELETE FROM content_assets WHERE content_item_id = ? AND asset_id = ?",
         args: [contentItemId, assetId],
@@ -75,16 +161,15 @@ export async function upsertContent(formData: FormData) {
   const hook = parseText(formData.get("hook"));
   const body = parseText(formData.get("body"));
   const close = parseText(formData.get("close"));
-  const targetPostAt = parseText(formData.get("target_post_at"));
+  const submittedTargetPostAt = parseText(formData.get("target_post_at"));
   const notes = parseText(formData.get("notes"));
-  const channelIds = formData
-    .getAll("channel_ids")
-    .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value));
-  const assetIds = formData
-    .getAll("asset_ids")
-    .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value));
+  const channelIds = getSelectedIds(formData, "channel_ids");
+  const channelSchedules = Object.fromEntries(
+    channelIds.map((channelId) => [channelId, parseText(formData.get(`channel_schedule_${channelId}`))]),
+  ) as Record<number, string | null>;
+  const targetPostAt = getEarliestDate(Object.values(channelSchedules))
+    ?? (channelIds.length ? null : submittedTargetPostAt);
+  const assetIds = getSelectedIds(formData, "asset_ids");
 
   if (!title || !formatId || !pillarId || (brand !== "seb" && brand !== "ublend")) {
     throw new Error("Missing required content fields.");
@@ -122,16 +207,11 @@ export async function upsertContent(formData: FormData) {
     contentId = Number(result.lastInsertRowid);
   }
 
-  await syncContentChannels(contentId, channelIds);
+  await syncContentChannels(contentId, channelIds, channelSchedules);
   await syncAssets(contentId, assetIds);
   await touchContentStatus(contentId);
 
-  revalidatePath("/");
-  revalidatePath("/content");
-  revalidatePath("/content/new");
-  revalidatePath("/calendar");
-  revalidatePath("/pipeline");
-  revalidatePath(`/content/${contentId}`);
+  revalidateContentRoutes(contentId);
   redirect(`/content/${contentId}`);
 }
 
@@ -146,7 +226,7 @@ export async function saveChannelSchedule(formData: FormData) {
     throw new Error("Channel schedule context is required.");
   }
 
-  const nextStatus = postedUrl ? "posted" : scheduledAt ? "scheduled" : "planned";
+  const nextStatus = getChannelStatus({ scheduledAt, postedAt, postedUrl });
   const db = await getDb();
 
   await db.execute({
@@ -158,12 +238,7 @@ export async function saveChannelSchedule(formData: FormData) {
 
   await touchContentStatus(contentItemId);
 
-  revalidatePath(`/content/${contentItemId}`);
-  revalidatePath("/content");
-  revalidatePath("/content/new");
-  revalidatePath("/calendar");
-  revalidatePath("/pipeline");
-  revalidatePath("/");
+  revalidateContentRoutes(contentItemId);
 }
 
 export async function markPosted(formData: FormData) {
@@ -185,10 +260,7 @@ export async function markPosted(formData: FormData) {
 
   await touchContentStatus(contentItemId);
 
-  revalidatePath(`/content/${contentItemId}`);
-  revalidatePath("/pipeline");
-  revalidatePath("/kpis");
-  revalidatePath("/");
+  revalidateKpiRoutes(contentItemId);
 }
 
 export async function deleteContent(formData: FormData) {
@@ -198,11 +270,7 @@ export async function deleteContent(formData: FormData) {
   const db = await getDb();
   await db.execute({ sql: "DELETE FROM content_items WHERE id = ?", args: [id] });
 
-  revalidatePath("/content");
-  revalidatePath("/content/new");
-  revalidatePath("/pipeline");
-  revalidatePath("/calendar");
-  revalidatePath("/");
+  revalidatePaths(CONTENT_COLLECTION_PATHS);
   redirect("/content");
 }
 
@@ -253,10 +321,7 @@ export async function upsertKpi(formData: FormData) {
   }
 
   await touchContentStatus(contentItemId);
-  revalidatePath(`/content/${contentItemId}`);
-  revalidatePath("/pipeline");
-  revalidatePath("/kpis");
-  revalidatePath("/");
+  revalidateKpiRoutes(contentItemId);
 }
 
 export async function deleteKpiSnapshot(formData: FormData) {
@@ -270,10 +335,9 @@ export async function deleteKpiSnapshot(formData: FormData) {
 
   if (contentItemId) {
     await touchContentStatus(contentItemId);
-    revalidatePath(`/content/${contentItemId}`);
   }
-  revalidatePath("/kpis");
-  revalidatePath("/");
+
+  revalidateKpiRoutes(contentItemId);
 }
 
 // Keep old name as alias for backwards compatibility
