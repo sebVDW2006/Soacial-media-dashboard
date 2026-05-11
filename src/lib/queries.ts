@@ -75,9 +75,110 @@ export async function getIdeaCount() {
   return Number(result.rows[0]?.count ?? 0);
 }
 
-export async function getContentItems(filterBrand?: Brand | "all") {
+export type ContentSortKey =
+  | "scheduled"
+  | "created"
+  | "posted"
+  | "edited";
+
+export type ContentStatusGroup =
+  | "all"
+  | "draft"
+  | "ready"
+  | "scheduled"
+  | "posted"
+  | "archived";
+
+export type GetContentItemsOptions = {
+  brand?: Brand | "all";
+  search?: string | null;
+  statusGroup?: ContentStatusGroup;
+  formatId?: number | null;
+  pillarId?: number | null;
+  channelId?: number | null;
+  sort?: ContentSortKey;
+};
+
+const STATUS_GROUP_TO_STATUSES: Record<ContentStatusGroup, string[]> = {
+  all: [],
+  draft: ["idea", "drafting"],
+  ready: ["captured"],
+  scheduled: ["scheduled"],
+  posted: ["posted", "tracked"],
+  archived: [],
+};
+
+function buildContentSortClause(sort: ContentSortKey) {
+  switch (sort) {
+    case "created":
+      return "ci.created_at DESC, ci.id DESC";
+    case "posted":
+      return "COALESCE((SELECT MAX(posted_at) FROM content_channels WHERE content_item_id = ci.id), ci.updated_at) DESC";
+    case "edited":
+      return "ci.updated_at DESC, ci.id DESC";
+    case "scheduled":
+    default:
+      return "CASE WHEN ci.target_post_at IS NULL THEN 1 ELSE 0 END, ci.target_post_at ASC, ci.created_at ASC";
+  }
+}
+
+export async function getContentItems(options?: GetContentItemsOptions | Brand | "all") {
+  const opts: GetContentItemsOptions =
+    typeof options === "string" ? { brand: options } : options ?? {};
   const db = await getDb();
-  const brand = normalizeBrandFilter(filterBrand);
+  const brand = normalizeBrandFilter(opts.brand);
+  const statusGroup = opts.statusGroup ?? "all";
+  const sort = opts.sort ?? "scheduled";
+  const search = opts.search?.trim() || null;
+
+  const conditions: string[] = [];
+  const args: Array<string | number | null> = [];
+
+  conditions.push("(? IS NULL OR ci.brand = ?)");
+  args.push(brand, brand);
+
+  if (statusGroup === "archived") {
+    conditions.push("ci.archived = 1");
+  } else {
+    conditions.push("ci.archived = 0");
+    const statuses = STATUS_GROUP_TO_STATUSES[statusGroup];
+    if (statuses.length) {
+      conditions.push(`ci.status IN (${statuses.map(() => "?").join(", ")})`);
+      args.push(...statuses);
+    }
+  }
+
+  if (opts.formatId) {
+    conditions.push("ci.format_id = ?");
+    args.push(opts.formatId);
+  }
+
+  if (opts.pillarId) {
+    conditions.push("ci.pillar_id = ?");
+    args.push(opts.pillarId);
+  }
+
+  if (opts.channelId) {
+    conditions.push(
+      "EXISTS (SELECT 1 FROM content_channels cc2 WHERE cc2.content_item_id = ci.id AND cc2.channel_id = ?)",
+    );
+    args.push(opts.channelId);
+  }
+
+  if (search) {
+    const like = `%${search}%`;
+    conditions.push(
+      `(
+        LOWER(ci.title) LIKE LOWER(?)
+        OR LOWER(COALESCE(ci.notes, '')) LIKE LOWER(?)
+        OR LOWER(COALESCE(ci.hook, '')) LIKE LOWER(?)
+        OR LOWER(f.name) LIKE LOWER(?)
+        OR LOWER(p.name) LIKE LOWER(?)
+      )`,
+    );
+    args.push(like, like, like, like, like);
+  }
+
   const result = await db.execute({
     sql: `SELECT ci.*, f.name AS format_name, p.name AS pillar_name,
         GROUP_CONCAT(ch.name, ', ') AS channel_names
@@ -86,12 +187,75 @@ export async function getContentItems(filterBrand?: Brand | "all") {
       INNER JOIN pillars p ON p.id = ci.pillar_id
       LEFT JOIN content_channels cc ON cc.content_item_id = ci.id
       LEFT JOIN channels ch ON ch.id = cc.channel_id
-      WHERE (? IS NULL OR ci.brand = ?)
+      WHERE ${conditions.join(" AND ")}
       GROUP BY ci.id
-      ORDER BY COALESCE(ci.target_post_at, ci.created_at) ASC`,
-    args: [brand, brand],
+      ORDER BY ${buildContentSortClause(sort)}`,
+    args,
   });
   return rowsAs<ContentListItem>(result);
+}
+
+export async function getContentStatusCounts(options?: Omit<GetContentItemsOptions, "statusGroup" | "sort">) {
+  const db = await getDb();
+  const brand = normalizeBrandFilter(options?.brand);
+  const search = options?.search?.trim() || null;
+
+  const conditions: string[] = ["(? IS NULL OR ci.brand = ?)"];
+  const args: Array<string | number | null> = [brand, brand];
+
+  if (options?.formatId) {
+    conditions.push("ci.format_id = ?");
+    args.push(options.formatId);
+  }
+  if (options?.pillarId) {
+    conditions.push("ci.pillar_id = ?");
+    args.push(options.pillarId);
+  }
+  if (options?.channelId) {
+    conditions.push(
+      "EXISTS (SELECT 1 FROM content_channels cc2 WHERE cc2.content_item_id = ci.id AND cc2.channel_id = ?)",
+    );
+    args.push(options.channelId);
+  }
+  if (search) {
+    const like = `%${search}%`;
+    conditions.push(
+      `(
+        LOWER(ci.title) LIKE LOWER(?)
+        OR LOWER(COALESCE(ci.notes, '')) LIKE LOWER(?)
+        OR LOWER(COALESCE(ci.hook, '')) LIKE LOWER(?)
+        OR LOWER(f.name) LIKE LOWER(?)
+        OR LOWER(p.name) LIKE LOWER(?)
+      )`,
+    );
+    args.push(like, like, like, like, like);
+  }
+
+  const result = await db.execute({
+    sql: `SELECT
+        SUM(CASE WHEN ci.archived = 0 THEN 1 ELSE 0 END) AS all_count,
+        SUM(CASE WHEN ci.archived = 0 AND ci.status IN ('idea', 'drafting') THEN 1 ELSE 0 END) AS draft_count,
+        SUM(CASE WHEN ci.archived = 0 AND ci.status = 'captured' THEN 1 ELSE 0 END) AS ready_count,
+        SUM(CASE WHEN ci.archived = 0 AND ci.status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled_count,
+        SUM(CASE WHEN ci.archived = 0 AND ci.status IN ('posted', 'tracked') THEN 1 ELSE 0 END) AS posted_count,
+        SUM(CASE WHEN ci.archived = 1 THEN 1 ELSE 0 END) AS archived_count
+      FROM content_items ci
+      INNER JOIN formats f ON f.id = ci.format_id
+      INNER JOIN pillars p ON p.id = ci.pillar_id
+      WHERE ${conditions.join(" AND ")}`,
+    args,
+  });
+
+  const row = (result.rows[0] ?? {}) as Record<string, unknown>;
+  const toNum = (key: string) => Number(row[key] ?? 0);
+  return {
+    all: toNum("all_count"),
+    draft: toNum("draft_count"),
+    ready: toNum("ready_count"),
+    scheduled: toNum("scheduled_count"),
+    posted: toNum("posted_count"),
+    archived: toNum("archived_count"),
+  };
 }
 
 export async function getContentById(id: number) {

@@ -274,6 +274,32 @@ export async function deleteContent(formData: FormData) {
   redirect("/content");
 }
 
+export async function archiveContent(formData: FormData) {
+  const id = parseNullableInteger(formData.get("id"));
+  if (!id) throw new Error("Content ID required.");
+
+  const db = await getDb();
+  await db.execute({
+    sql: "UPDATE content_items SET archived = 1, updated_at = datetime('now') WHERE id = ?",
+    args: [id],
+  });
+
+  revalidatePaths(CONTENT_COLLECTION_PATHS);
+}
+
+export async function unarchiveContent(formData: FormData) {
+  const id = parseNullableInteger(formData.get("id"));
+  if (!id) throw new Error("Content ID required.");
+
+  const db = await getDb();
+  await db.execute({
+    sql: "UPDATE content_items SET archived = 0, updated_at = datetime('now') WHERE id = ?",
+    args: [id],
+  });
+
+  revalidatePaths(CONTENT_COLLECTION_PATHS);
+}
+
 export async function upsertKpi(formData: FormData) {
   const contentChannelId = parseNullableInteger(formData.get("content_channel_id"));
   const contentItemId = parseNullableInteger(formData.get("content_item_id"));

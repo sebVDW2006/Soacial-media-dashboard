@@ -40,6 +40,7 @@ async function ensureSchema(client: Client) {
 async function ensureMigrations(client: Client) {
   const migrations = [
     "ALTER TABLE content_items ADD COLUMN post_type TEXT NOT NULL DEFAULT 'single-image'",
+    "ALTER TABLE content_items ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
   ];
   for (const sql of migrations) {
     try {

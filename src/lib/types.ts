@@ -82,6 +82,7 @@ export type ContentItem = {
   target_post_at: string | null;
   week_iso: string | null;
   notes: string | null;
+  archived: number;
   created_at: string;
   updated_at: string;
 };
