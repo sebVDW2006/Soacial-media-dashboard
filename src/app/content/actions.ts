@@ -14,6 +14,13 @@ function getEarliestDate(values: Array<string | null>) {
   return valid.reduce((earliest, current) => (current < earliest ? current : earliest));
 }
 
+function parseWeekIso(value: string | null) {
+  if (!value || !/^\d{4}-W\d{2}$/.test(value)) return null;
+
+  const weekNumber = Number(value.slice(-2));
+  return weekNumber >= 1 && weekNumber <= 53 ? value : null;
+}
+
 function getSelectedIds(formData: FormData, key: string) {
   return formData
     .getAll(key)
@@ -162,6 +169,7 @@ export async function upsertContent(formData: FormData) {
   const body = parseText(formData.get("body"));
   const close = parseText(formData.get("close"));
   const submittedTargetPostAt = parseText(formData.get("target_post_at"));
+  const submittedWeekIso = parseWeekIso(parseText(formData.get("week_iso")));
   const notes = parseText(formData.get("notes"));
   const channelIds = getSelectedIds(formData, "channel_ids");
   const channelSchedules = Object.fromEntries(
@@ -187,7 +195,9 @@ export async function upsertContent(formData: FormData) {
     existingWeekIso = (existing.rows[0]?.week_iso as string | null) ?? null;
   }
 
-  const weekIso = targetPostAt ? getISOWeek(targetPostAt) : existingWeekIso ?? getCurrentWeek();
+  const weekIso = targetPostAt
+    ? getISOWeek(targetPostAt)
+    : existingWeekIso ?? submittedWeekIso ?? getCurrentWeek();
 
   if (id) {
     await db.execute({
@@ -244,19 +254,32 @@ export async function saveChannelSchedule(formData: FormData) {
 export async function markPosted(formData: FormData) {
   const contentChannelId = parseNullableInteger(formData.get("content_channel_id"));
   const contentItemId = parseNullableInteger(formData.get("content_item_id"));
+  const postedUrl = parseText(formData.get("posted_url"));
 
   if (!contentChannelId || !contentItemId) {
     throw new Error("Channel context is required.");
   }
 
   const db = await getDb();
-  await db.execute({
-    sql: `UPDATE content_channels
-      SET posted_at = COALESCE(posted_at, datetime('now')),
-          status = 'posted'
-      WHERE id = ?`,
-    args: [contentChannelId],
-  });
+
+  if (postedUrl !== null) {
+    await db.execute({
+      sql: `UPDATE content_channels
+        SET posted_at = COALESCE(posted_at, datetime('now')),
+            posted_url = ?,
+            status = 'posted'
+        WHERE id = ?`,
+      args: [postedUrl, contentChannelId],
+    });
+  } else {
+    await db.execute({
+      sql: `UPDATE content_channels
+        SET posted_at = COALESCE(posted_at, datetime('now')),
+            status = 'posted'
+        WHERE id = ?`,
+      args: [contentChannelId],
+    });
+  }
 
   await touchContentStatus(contentItemId);
 
@@ -274,19 +297,50 @@ export async function deleteContent(formData: FormData) {
   redirect("/content");
 }
 
+export async function archiveContent(formData: FormData) {
+  const id = parseNullableInteger(formData.get("id"));
+  if (!id) throw new Error("Content ID required.");
+
+  const db = await getDb();
+  await db.execute({
+    sql: "UPDATE content_items SET archived = 1, updated_at = datetime('now') WHERE id = ?",
+    args: [id],
+  });
+
+  revalidatePaths(CONTENT_COLLECTION_PATHS);
+}
+
+export async function unarchiveContent(formData: FormData) {
+  const id = parseNullableInteger(formData.get("id"));
+  if (!id) throw new Error("Content ID required.");
+
+  const db = await getDb();
+  await db.execute({
+    sql: "UPDATE content_items SET archived = 0, updated_at = datetime('now') WHERE id = ?",
+    args: [id],
+  });
+
+  revalidatePaths(CONTENT_COLLECTION_PATHS);
+}
+
 export async function upsertKpi(formData: FormData) {
   const contentChannelId = parseNullableInteger(formData.get("content_channel_id"));
   const contentItemId = parseNullableInteger(formData.get("content_item_id"));
   const snapshotId = parseNullableInteger(formData.get("snapshot_id"));
+  const postAnalyticsId = parseNullableInteger(formData.get("post_analytics_id"));
 
   if (!contentChannelId || !contentItemId) {
     throw new Error("Channel KPI context is required.");
   }
 
   const impressions = parseInteger(formData.get("impressions"));
+  const reach = parseInteger(formData.get("reach"));
+  const views = parseInteger(formData.get("views"));
   const likes = parseInteger(formData.get("likes"));
   const comments = parseInteger(formData.get("comments"));
   const shares = parseInteger(formData.get("shares"));
+  const saves = parseInteger(formData.get("saves"));
+  const linkClicks = parseInteger(formData.get("link_clicks"));
   const follows = parseInteger(formData.get("follows"));
   const dmsOrLeads = parseInteger(formData.get("dms_or_leads"));
   const postedUrl = parseText(formData.get("posted_url"));
@@ -305,18 +359,54 @@ export async function upsertKpi(formData: FormData) {
     // Update existing snapshot
     await db.execute({
       sql: `UPDATE kpi_snapshots
-        SET impressions = ?, likes = ?, comments = ?, shares = ?, follows = ?, dms_or_leads = ?,
+        SET impressions = ?, reach = ?, views = ?, likes = ?, comments = ?, shares = ?,
+            saves = ?, link_clicks = ?, follows = ?, dms_or_leads = ?,
             captured_at = datetime('now')
         WHERE id = ?`,
-      args: [impressions, likes, comments, shares, follows, dmsOrLeads, snapshotId],
+      args: [
+        impressions,
+        reach,
+        views,
+        likes,
+        comments,
+        shares,
+        saves,
+        linkClicks,
+        follows,
+        dmsOrLeads,
+        snapshotId,
+      ],
     });
   } else {
     // Insert first snapshot
     await db.execute({
       sql: `INSERT INTO kpi_snapshots
-        (content_channel_id, impressions, likes, comments, shares, follows, dms_or_leads)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      args: [contentChannelId, impressions, likes, comments, shares, follows, dmsOrLeads],
+        (content_channel_id, impressions, reach, views, likes, comments, shares, saves, link_clicks, follows, dms_or_leads)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        contentChannelId,
+        impressions,
+        reach,
+        views,
+        likes,
+        comments,
+        shares,
+        saves,
+        linkClicks,
+        follows,
+        dmsOrLeads,
+      ],
+    });
+  }
+
+  if (postAnalyticsId) {
+    await db.execute({
+      sql: `UPDATE post_analytics
+        SET status = 'manual',
+            error_message = 'Manual override',
+            updated_at = datetime('now')
+        WHERE id = ?`,
+      args: [postAnalyticsId],
     });
   }
 

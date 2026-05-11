@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import { aggregateKpis } from "@/lib/kpi";
+import { mergeAccountSlots } from "@/lib/social";
 import { getCurrentWeek, getWeekTuesday, weekRange } from "@/lib/week";
 import type {
   Asset,
@@ -12,6 +13,8 @@ import type {
   Format,
   Idea,
   Pillar,
+  PostAnalyticsRow,
+  SafeSocialAccount,
   WeeklyReview,
 } from "@/lib/types";
 
@@ -20,7 +23,7 @@ type RowsResult = {
 };
 
 function rowsAs<T>(result: RowsResult) {
-  return result.rows as unknown as T[];
+  return result.rows.map((row) => ({ ...(row as Record<string, unknown>) })) as T[];
 }
 
 function firstRowAs<T>(result: RowsResult) {
@@ -44,6 +47,35 @@ export async function getReferenceData() {
     formats: rowsAs<Format>(formats),
     channels: rowsAs<Channel>(channels),
   };
+}
+
+export async function getSafeSocialAccounts() {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT
+        id,
+        brand,
+        platform,
+        account_type,
+        display_name,
+        handle,
+        external_account_id,
+        token_expires_at,
+        connection_status,
+        last_synced_at,
+        created_at,
+        updated_at
+      FROM social_accounts
+      ORDER BY brand, platform, account_type`,
+    args: [],
+  });
+
+  return rowsAs<SafeSocialAccount>(result);
+}
+
+export async function getSocialAccountSlots() {
+  const accounts = await getSafeSocialAccounts();
+  return mergeAccountSlots(accounts);
 }
 
 export async function getIdeas(filterBrand?: Brand | "all") {
@@ -75,9 +107,110 @@ export async function getIdeaCount() {
   return Number(result.rows[0]?.count ?? 0);
 }
 
-export async function getContentItems(filterBrand?: Brand | "all") {
+export type ContentSortKey =
+  | "scheduled"
+  | "created"
+  | "posted"
+  | "edited";
+
+export type ContentStatusGroup =
+  | "all"
+  | "draft"
+  | "ready"
+  | "scheduled"
+  | "posted"
+  | "archived";
+
+export type GetContentItemsOptions = {
+  brand?: Brand | "all";
+  search?: string | null;
+  statusGroup?: ContentStatusGroup;
+  formatId?: number | null;
+  pillarId?: number | null;
+  channelId?: number | null;
+  sort?: ContentSortKey;
+};
+
+const STATUS_GROUP_TO_STATUSES: Record<ContentStatusGroup, string[]> = {
+  all: [],
+  draft: ["idea", "drafting"],
+  ready: ["captured"],
+  scheduled: ["scheduled"],
+  posted: ["posted", "tracked"],
+  archived: [],
+};
+
+function buildContentSortClause(sort: ContentSortKey) {
+  switch (sort) {
+    case "created":
+      return "ci.created_at DESC, ci.id DESC";
+    case "posted":
+      return "COALESCE((SELECT MAX(posted_at) FROM content_channels WHERE content_item_id = ci.id), ci.updated_at) DESC";
+    case "edited":
+      return "ci.updated_at DESC, ci.id DESC";
+    case "scheduled":
+    default:
+      return "CASE WHEN ci.target_post_at IS NULL THEN 1 ELSE 0 END, ci.target_post_at ASC, ci.created_at ASC";
+  }
+}
+
+export async function getContentItems(options?: GetContentItemsOptions | Brand | "all") {
+  const opts: GetContentItemsOptions =
+    typeof options === "string" ? { brand: options } : options ?? {};
   const db = await getDb();
-  const brand = normalizeBrandFilter(filterBrand);
+  const brand = normalizeBrandFilter(opts.brand);
+  const statusGroup = opts.statusGroup ?? "all";
+  const sort = opts.sort ?? "scheduled";
+  const search = opts.search?.trim() || null;
+
+  const conditions: string[] = [];
+  const args: Array<string | number | null> = [];
+
+  conditions.push("(? IS NULL OR ci.brand = ?)");
+  args.push(brand, brand);
+
+  if (statusGroup === "archived") {
+    conditions.push("ci.archived = 1");
+  } else {
+    conditions.push("ci.archived = 0");
+    const statuses = STATUS_GROUP_TO_STATUSES[statusGroup];
+    if (statuses.length) {
+      conditions.push(`ci.status IN (${statuses.map(() => "?").join(", ")})`);
+      args.push(...statuses);
+    }
+  }
+
+  if (opts.formatId) {
+    conditions.push("ci.format_id = ?");
+    args.push(opts.formatId);
+  }
+
+  if (opts.pillarId) {
+    conditions.push("ci.pillar_id = ?");
+    args.push(opts.pillarId);
+  }
+
+  if (opts.channelId) {
+    conditions.push(
+      "EXISTS (SELECT 1 FROM content_channels cc2 WHERE cc2.content_item_id = ci.id AND cc2.channel_id = ?)",
+    );
+    args.push(opts.channelId);
+  }
+
+  if (search) {
+    const like = `%${search}%`;
+    conditions.push(
+      `(
+        LOWER(ci.title) LIKE LOWER(?)
+        OR LOWER(COALESCE(ci.notes, '')) LIKE LOWER(?)
+        OR LOWER(COALESCE(ci.hook, '')) LIKE LOWER(?)
+        OR LOWER(f.name) LIKE LOWER(?)
+        OR LOWER(p.name) LIKE LOWER(?)
+      )`,
+    );
+    args.push(like, like, like, like, like);
+  }
+
   const result = await db.execute({
     sql: `SELECT ci.*, f.name AS format_name, p.name AS pillar_name,
         GROUP_CONCAT(ch.name, ', ') AS channel_names
@@ -86,12 +219,75 @@ export async function getContentItems(filterBrand?: Brand | "all") {
       INNER JOIN pillars p ON p.id = ci.pillar_id
       LEFT JOIN content_channels cc ON cc.content_item_id = ci.id
       LEFT JOIN channels ch ON ch.id = cc.channel_id
-      WHERE (? IS NULL OR ci.brand = ?)
+      WHERE ${conditions.join(" AND ")}
       GROUP BY ci.id
-      ORDER BY COALESCE(ci.target_post_at, ci.created_at) ASC`,
-    args: [brand, brand],
+      ORDER BY ${buildContentSortClause(sort)}`,
+    args,
   });
   return rowsAs<ContentListItem>(result);
+}
+
+export async function getContentStatusCounts(options?: Omit<GetContentItemsOptions, "statusGroup" | "sort">) {
+  const db = await getDb();
+  const brand = normalizeBrandFilter(options?.brand);
+  const search = options?.search?.trim() || null;
+
+  const conditions: string[] = ["(? IS NULL OR ci.brand = ?)"];
+  const args: Array<string | number | null> = [brand, brand];
+
+  if (options?.formatId) {
+    conditions.push("ci.format_id = ?");
+    args.push(options.formatId);
+  }
+  if (options?.pillarId) {
+    conditions.push("ci.pillar_id = ?");
+    args.push(options.pillarId);
+  }
+  if (options?.channelId) {
+    conditions.push(
+      "EXISTS (SELECT 1 FROM content_channels cc2 WHERE cc2.content_item_id = ci.id AND cc2.channel_id = ?)",
+    );
+    args.push(options.channelId);
+  }
+  if (search) {
+    const like = `%${search}%`;
+    conditions.push(
+      `(
+        LOWER(ci.title) LIKE LOWER(?)
+        OR LOWER(COALESCE(ci.notes, '')) LIKE LOWER(?)
+        OR LOWER(COALESCE(ci.hook, '')) LIKE LOWER(?)
+        OR LOWER(f.name) LIKE LOWER(?)
+        OR LOWER(p.name) LIKE LOWER(?)
+      )`,
+    );
+    args.push(like, like, like, like, like);
+  }
+
+  const result = await db.execute({
+    sql: `SELECT
+        SUM(CASE WHEN ci.archived = 0 THEN 1 ELSE 0 END) AS all_count,
+        SUM(CASE WHEN ci.archived = 0 AND ci.status IN ('idea', 'drafting') THEN 1 ELSE 0 END) AS draft_count,
+        SUM(CASE WHEN ci.archived = 0 AND ci.status = 'captured' THEN 1 ELSE 0 END) AS ready_count,
+        SUM(CASE WHEN ci.archived = 0 AND ci.status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled_count,
+        SUM(CASE WHEN ci.archived = 0 AND ci.status IN ('posted', 'tracked') THEN 1 ELSE 0 END) AS posted_count,
+        SUM(CASE WHEN ci.archived = 1 THEN 1 ELSE 0 END) AS archived_count
+      FROM content_items ci
+      INNER JOIN formats f ON f.id = ci.format_id
+      INNER JOIN pillars p ON p.id = ci.pillar_id
+      WHERE ${conditions.join(" AND ")}`,
+    args,
+  });
+
+  const row = (result.rows[0] ?? {}) as Record<string, unknown>;
+  const toNum = (key: string) => Number(row[key] ?? 0);
+  return {
+    all: toNum("all_count"),
+    draft: toNum("draft_count"),
+    ready: toNum("ready_count"),
+    scheduled: toNum("scheduled_count"),
+    posted: toNum("posted_count"),
+    archived: toNum("archived_count"),
+  };
 }
 
 export async function getContentById(id: number) {
@@ -435,10 +631,19 @@ export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
         cc.scheduled_at,
         cc.posted_url,
         cc.status AS channel_status,
-        ch.name AS channel_name
+        ch.name AS channel_name,
+        ch.slug AS channel_slug,
+        pa.id AS post_analytics_id,
+        pa.social_account_id,
+        pa.platform AS analytics_platform,
+        pa.status AS analytics_status,
+        pa.last_synced_at AS analytics_last_synced_at,
+        pa.error_message AS analytics_error_message,
+        pa.external_post_id
       FROM content_items ci
       INNER JOIN content_channels cc ON cc.content_item_id = ci.id
       INNER JOIN channels ch ON ch.id = cc.channel_id
+      LEFT JOIN post_analytics pa ON pa.post_id = cc.id
       WHERE ci.status IN ('scheduled', 'posted')
         AND (? IS NULL OR ci.brand = ?)
       ORDER BY COALESCE(ci.target_post_at, ci.created_at) ASC, ci.id, ch.id`,
@@ -455,9 +660,17 @@ export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
     channels: Array<{
       content_channel_id: number;
       channel_name: string;
+      channel_slug: string;
       scheduled_at: string | null;
       posted_url: string | null;
       channel_status: string;
+      post_analytics_id: number | null;
+      social_account_id: number | null;
+      analytics_platform: string | null;
+      analytics_status: string | null;
+      analytics_last_synced_at: string | null;
+      analytics_error_message: string | null;
+      external_post_id: string | null;
     }>;
   }>();
 
@@ -476,9 +689,17 @@ export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
     map.get(id)!.channels.push({
       content_channel_id: Number(row.content_channel_id),
       channel_name: String(row.channel_name ?? ""),
+      channel_slug: String(row.channel_slug ?? ""),
       scheduled_at: row.scheduled_at ? String(row.scheduled_at) : null,
       posted_url: row.posted_url ? String(row.posted_url) : null,
       channel_status: String(row.channel_status ?? ""),
+      post_analytics_id: row.post_analytics_id ? Number(row.post_analytics_id) : null,
+      social_account_id: row.social_account_id ? Number(row.social_account_id) : null,
+      analytics_platform: row.analytics_platform ? String(row.analytics_platform) : null,
+      analytics_status: row.analytics_status ? String(row.analytics_status) : null,
+      analytics_last_synced_at: row.analytics_last_synced_at ? String(row.analytics_last_synced_at) : null,
+      analytics_error_message: row.analytics_error_message ? String(row.analytics_error_message) : null,
+      external_post_id: row.external_post_id ? String(row.external_post_id) : null,
     });
   }
 
@@ -532,16 +753,29 @@ export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
         cc.id AS content_channel_id,
         cc.posted_url,
         ch.name AS channel_name,
+        ch.slug AS channel_slug,
+        pa.id AS post_analytics_id,
+        pa.social_account_id,
+        pa.platform AS analytics_platform,
+        pa.status AS analytics_status,
+        pa.last_synced_at AS analytics_last_synced_at,
+        pa.error_message AS analytics_error_message,
+        pa.engagement_rate,
         ks.id AS snapshot_id,
-        ks.impressions,
-        ks.likes,
-        ks.comments,
-        ks.shares,
-        ks.follows,
-        ks.dms_or_leads
+        COALESCE(ks.impressions, pa.impressions, 0) AS impressions,
+        COALESCE(ks.reach, pa.reach, 0) AS reach,
+        COALESCE(ks.views, pa.views, 0) AS views,
+        COALESCE(ks.likes, pa.likes, 0) AS likes,
+        COALESCE(ks.comments, pa.comments, 0) AS comments,
+        COALESCE(ks.shares, pa.shares, 0) AS shares,
+        COALESCE(ks.saves, pa.saves, 0) AS saves,
+        COALESCE(ks.link_clicks, pa.clicks, 0) AS link_clicks,
+        COALESCE(ks.follows, pa.follower_growth_from_post, 0) AS follows,
+        COALESCE(ks.dms_or_leads, 0) AS dms_or_leads
       FROM content_items ci
       INNER JOIN content_channels cc ON cc.content_item_id = ci.id
       INNER JOIN channels ch ON ch.id = cc.channel_id
+      LEFT JOIN post_analytics pa ON pa.post_id = cc.id
       LEFT JOIN kpi_snapshots ks ON ks.content_channel_id = cc.id
         AND ks.captured_at = (
           SELECT MAX(captured_at) FROM kpi_snapshots WHERE content_channel_id = cc.id
@@ -560,12 +794,24 @@ export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
     channels: Array<{
       content_channel_id: number;
       channel_name: string;
+      channel_slug: string;
       posted_url: string | null;
+      post_analytics_id: number | null;
+      social_account_id: number | null;
+      analytics_platform: string | null;
+      analytics_status: string | null;
+      analytics_last_synced_at: string | null;
+      analytics_error_message: string | null;
+      engagement_rate: number;
       snapshot_id: number | null;
       impressions: number;
+      reach: number;
+      views: number;
       likes: number;
       comments: number;
       shares: number;
+      saves: number;
+      link_clicks: number;
       follows: number;
       dms_or_leads: number;
     }>;
@@ -584,12 +830,24 @@ export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
     map.get(id)!.channels.push({
       content_channel_id: Number(row.content_channel_id),
       channel_name: String(row.channel_name ?? ""),
+      channel_slug: String(row.channel_slug ?? ""),
       posted_url: row.posted_url ? String(row.posted_url) : null,
+      post_analytics_id: row.post_analytics_id ? Number(row.post_analytics_id) : null,
+      social_account_id: row.social_account_id ? Number(row.social_account_id) : null,
+      analytics_platform: row.analytics_platform ? String(row.analytics_platform) : null,
+      analytics_status: row.analytics_status ? String(row.analytics_status) : null,
+      analytics_last_synced_at: row.analytics_last_synced_at ? String(row.analytics_last_synced_at) : null,
+      analytics_error_message: row.analytics_error_message ? String(row.analytics_error_message) : null,
+      engagement_rate: Number(row.engagement_rate ?? 0),
       snapshot_id: row.snapshot_id ? Number(row.snapshot_id) : null,
       impressions: Number(row.impressions ?? 0),
+      reach: Number(row.reach ?? 0),
+      views: Number(row.views ?? 0),
       likes: Number(row.likes ?? 0),
       comments: Number(row.comments ?? 0),
       shares: Number(row.shares ?? 0),
+      saves: Number(row.saves ?? 0),
+      link_clicks: Number(row.link_clicks ?? 0),
       follows: Number(row.follows ?? 0),
       dms_or_leads: Number(row.dms_or_leads ?? 0),
     });
@@ -615,7 +873,13 @@ export async function getTopKpiPosts(days = 30) {
       SELECT
         ci.id,
         ci.title,
-        SUM(COALESCE(ls.likes, 0) + COALESCE(ls.comments, 0) + COALESCE(ls.shares, 0)) AS total_engagement
+        SUM(
+          COALESCE(ls.likes, 0) +
+          COALESCE(ls.comments, 0) +
+          COALESCE(ls.shares, 0) +
+          COALESCE(ls.saves, 0) +
+          COALESCE(ls.link_clicks, 0)
+        ) AS total_engagement
       FROM latest_snapshots ls
       INNER JOIN content_channels cc ON cc.id = ls.content_channel_id
       INNER JOIN content_items ci ON ci.id = cc.content_item_id
@@ -630,4 +894,95 @@ export async function getTopKpiPosts(days = 30) {
     title: string;
     total_engagement: number;
   }>(result);
+}
+
+export async function getSocialAnalyticsOverview(filterBrand?: Brand | "all") {
+  const db = await getDb();
+  const brand = normalizeBrandFilter(filterBrand);
+  const result = await db.execute({
+    sql: `SELECT
+        pa.*,
+        ci.id AS content_id,
+        ci.title,
+        ch.name AS channel_name,
+        ch.slug AS channel_slug,
+        sa.display_name AS account_display_name,
+        sa.handle AS account_handle,
+        sa.connection_status AS account_connection_status
+      FROM post_analytics pa
+      INNER JOIN content_channels cc ON cc.id = pa.post_id
+      INNER JOIN content_items ci ON ci.id = cc.content_item_id
+      INNER JOIN channels ch ON ch.id = cc.channel_id
+      LEFT JOIN social_accounts sa ON sa.id = pa.social_account_id
+      WHERE (? IS NULL OR pa.brand = ?)
+      ORDER BY COALESCE(pa.last_synced_at, pa.updated_at, pa.created_at) DESC`,
+    args: [brand, brand],
+  });
+
+  const rows = result.rows.map((row) => {
+    const metrics = {
+      impressions: Number(row.impressions ?? 0),
+      reach: Number(row.reach ?? 0),
+      views: Number(row.views ?? 0),
+      likes: Number(row.likes ?? 0),
+      comments: Number(row.comments ?? 0),
+      shares: Number(row.shares ?? 0),
+      saves: Number(row.saves ?? 0),
+      clicks: Number(row.clicks ?? 0),
+      engagementRate: Number(row.engagement_rate ?? 0),
+      followerGrowthFromPost: Number(row.follower_growth_from_post ?? 0),
+    };
+    const engagement = metrics.likes + metrics.comments + metrics.shares + metrics.saves + metrics.clicks;
+
+    return {
+      ...(row as unknown as PostAnalyticsRow),
+      content_id: Number(row.content_id),
+      title: String(row.title ?? ""),
+      channel_name: String(row.channel_name ?? ""),
+      channel_slug: String(row.channel_slug ?? ""),
+      account_display_name: row.account_display_name ? String(row.account_display_name) : null,
+      account_handle: row.account_handle ? String(row.account_handle) : null,
+      account_connection_status: row.account_connection_status ? String(row.account_connection_status) : null,
+      engagement,
+      metrics,
+    };
+  });
+
+  const totals = rows.reduce(
+    (acc, row) => {
+      acc.impressions += row.metrics.impressions;
+      acc.reach += row.metrics.reach;
+      acc.engagement += row.engagement;
+      return acc;
+    },
+    { impressions: 0, reach: 0, engagement: 0 },
+  );
+  const syncedRows = rows.filter((row) => row.status === "synced");
+  const averageEngagementRate = syncedRows.length
+    ? Number((syncedRows.reduce((total, row) => total + row.metrics.engagementRate, 0) / syncedRows.length).toFixed(2))
+    : 0;
+
+  function bestBy<T extends { label: string; engagement: number }>(items: T[]) {
+    return items.sort((a, b) => b.engagement - a.engagement)[0] ?? null;
+  }
+
+  function groupEngagement(keyFor: (row: (typeof rows)[number]) => string) {
+    const groups = new Map<string, number>();
+
+    for (const row of rows) {
+      const key = keyFor(row);
+      groups.set(key, (groups.get(key) ?? 0) + row.engagement);
+    }
+
+    return Array.from(groups.entries()).map(([label, engagement]) => ({ label, engagement }));
+  }
+
+  return {
+    rows,
+    totals,
+    averageEngagementRate,
+    bestPost: bestBy(rows.map((row) => ({ label: row.title, engagement: row.engagement }))),
+    bestPlatform: bestBy(groupEngagement((row) => String(row.platform))),
+    bestAccount: bestBy(groupEngagement((row) => row.account_display_name ?? "No account")),
+  };
 }

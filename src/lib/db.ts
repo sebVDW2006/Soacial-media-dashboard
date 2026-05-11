@@ -40,6 +40,8 @@ async function ensureSchema(client: Client) {
 async function ensureMigrations(client: Client) {
   const migrations = [
     "ALTER TABLE content_items ADD COLUMN post_type TEXT NOT NULL DEFAULT 'single-image'",
+    "ALTER TABLE kpi_snapshots ADD COLUMN reach INTEGER DEFAULT 0",
+    "ALTER TABLE content_items ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
   ];
   for (const sql of migrations) {
     try {
@@ -102,7 +104,7 @@ export async function touchContentStatus(contentItemId: number) {
   const db = await getDb();
   const scheduled = await db.execute({
     sql: `SELECT
-        COUNT(*) AS scheduled_count,
+        SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled_count,
         SUM(CASE WHEN status = 'posted' THEN 1 ELSE 0 END) AS posted_count
       FROM content_channels
       WHERE content_item_id = ?`,
@@ -122,13 +124,7 @@ export async function touchContentStatus(contentItemId: number) {
   if (postedCount > 0) {
     nextStatus = "posted";
   } else if (scheduledCount > 0) {
-    const content = await db.execute({
-      sql: "SELECT target_post_at FROM content_items WHERE id = ?",
-      args: [contentItemId],
-    });
-    if (content.rows[0]?.target_post_at) {
-      nextStatus = "scheduled";
-    }
+    nextStatus = "scheduled";
   }
 
   const tracked = await db.execute({
