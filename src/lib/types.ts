@@ -9,20 +9,6 @@ export type ContentStatus =
   | "posted"
   | "tracked";
 export type ChannelStatus = "planned" | "scheduled" | "posted";
-export type SocialPlatform = "instagram" | "linkedin";
-export type SocialAccountType =
-  | "instagram_business"
-  | "instagram_creator"
-  | "linkedin_page"
-  | "linkedin_member";
-export type SocialConnectionStatus = "connected" | "expired" | "needs_review" | "manual_only";
-export type PostAnalyticsStatus =
-  | "not_connected"
-  | "connected"
-  | "syncing"
-  | "synced"
-  | "failed"
-  | "manual";
 export type CaptureStatus = "planned" | "done";
 export type AssetKind =
   | "founder_clip"
@@ -96,7 +82,6 @@ export type ContentItem = {
   target_post_at: string | null;
   week_iso: string | null;
   notes: string | null;
-  archived: number;
   created_at: string;
   updated_at: string;
 };
@@ -109,89 +94,6 @@ export type ContentChannel = {
   posted_at: string | null;
   posted_url: string | null;
   status: ChannelStatus;
-};
-
-export type SocialAccount = {
-  id: number;
-  brand: Brand;
-  platform: SocialPlatform;
-  account_type: SocialAccountType;
-  display_name: string;
-  handle: string | null;
-  external_account_id: string | null;
-  access_token: string | null;
-  refresh_token: string | null;
-  token_expires_at: string | null;
-  connection_status: SocialConnectionStatus;
-  last_synced_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type SafeSocialAccount = Omit<SocialAccount, "access_token" | "refresh_token">;
-
-export type SocialAccountSlot = {
-  key: string;
-  brand: Brand;
-  platform: SocialPlatform;
-  account_type: SocialAccountType;
-  displayName: string;
-  handle: string;
-  account: SafeSocialAccount | null;
-};
-
-export type PostAnalyticsMetrics = {
-  impressions: number;
-  reach: number;
-  views: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  saves: number;
-  clicks: number;
-  engagementRate: number;
-  followerGrowthFromPost: number;
-};
-
-export type PostAnalytics = {
-  id: number;
-  postId: number;
-  socialAccountId: number | null;
-  platform: SocialPlatform;
-  brand: Brand;
-  postUrl: string;
-  externalPostId: string | null;
-  status: PostAnalyticsStatus;
-  lastSyncedAt: string | null;
-  errorMessage: string | null;
-  metrics: PostAnalyticsMetrics;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type PostAnalyticsRow = {
-  id: number;
-  post_id: number;
-  social_account_id: number | null;
-  platform: SocialPlatform;
-  brand: Brand;
-  post_url: string;
-  external_post_id: string | null;
-  status: PostAnalyticsStatus;
-  last_synced_at: string | null;
-  error_message: string | null;
-  impressions: number;
-  reach: number;
-  views: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  saves: number;
-  clicks: number;
-  engagement_rate: number;
-  follower_growth_from_post: number;
-  created_at: string;
-  updated_at: string;
 };
 
 export type CaptureSession = {
@@ -238,3 +140,4 @@ export type ContentChannelDetail = ContentChannel & {
 export type AssetWithLinks = Asset & {
   linked_content_titles?: string | null;
 };
+
