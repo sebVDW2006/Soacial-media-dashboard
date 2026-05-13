@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { KPIBars } from "@/components/KPIBars";
 import { DeleteKpiButton } from "@/components/DeleteKpiButton";
+import { KpiInputs } from "@/components/KpiInputs";
 import { upsertKpi } from "@/app/content/actions";
+import { analyticsStatusLabel, inferPlatformFromChannel, platformLabel } from "@/lib/social";
 import { getKpiSummaryRows, getPostedItemsWithChannels, getTopKpiPosts } from "@/lib/queries";
 
 type KpisPageProps = {
@@ -14,6 +16,13 @@ const GROUP_BY_LABELS: Record<string, string> = {
   channel: "Channel",
   brand: "Brand",
 };
+
+function statusClass(status?: string | null) {
+  if (status === "synced") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "failed") return "border-red-200 bg-red-50 text-red-800";
+  if (status === "manual") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-[var(--line)] bg-white text-[var(--ink-soft)]";
+}
 
 export default async function KpisPage({ searchParams }: KpisPageProps) {
   const params = (await searchParams) ?? {};
@@ -32,14 +41,27 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   ]);
 
   const groupByLabel = GROUP_BY_LABELS[groupBy] ?? groupBy;
+  const channelsAwaitingKpis = postedItems.reduce(
+    (acc, item) => acc + item.channels.filter((ch) => !ch.snapshot_id).length,
+    0,
+  );
 
   return (
     <div className="space-y-6">
 
       {/* Header */}
       <section className="app-card p-7 sm:p-8">
-        <h1 className="section-title">Track data</h1>
-        <p className="muted mt-2 text-sm">Enter your numbers after posting, then see what is working.</p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="section-title">Track data</h1>
+            <p className="muted mt-2 text-sm">Enter your numbers after posting, then see what is working.</p>
+          </div>
+          {channelsAwaitingKpis > 0 && (
+            <span className="chip">
+              {channelsAwaitingKpis} channel{channelsAwaitingKpis === 1 ? "" : "s"} awaiting numbers
+            </span>
+          )}
+        </div>
       </section>
 
       {/* Log / Edit KPIs */}
@@ -47,7 +69,9 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         <section className="app-card space-y-5 p-6 sm:p-7">
           <div>
             <h2 className="sub-title">Log KPIs</h2>
-            <p className="muted mt-1 text-sm">Numbers are saved per channel. Edit and re-save anytime.</p>
+            <p className="muted mt-1 text-sm">
+              Numbers save per channel. Tap &quot;Paste from Insights&quot; to fill all fields from a copied insights screen.
+            </p>
           </div>
 
           {postedItems.map((item) => (
@@ -59,59 +83,70 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                 <span className="chip">{item.brand === "seb" ? "Seb" : "uBlend"}</span>
               </div>
 
-              {item.channels.map((ch) => (
-                <div key={ch.content_channel_id} className="space-y-3 border-t border-[var(--line)] pt-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--ink-soft)]">
-                      {ch.channel_name}
-                      {ch.posted_url && (
-                        <a href={ch.posted_url} target="_blank" rel="noreferrer" className="ml-2 normal-case font-normal text-[var(--brand)]">
-                          view post ↗
-                        </a>
-                      )}
-                    </p>
-                    {ch.snapshot_id && (
-                      <DeleteKpiButton
-                        snapshotId={ch.snapshot_id}
-                        contentItemId={item.content_id}
-                      />
-                    )}
-                  </div>
+              {item.channels.map((ch) => {
+                const platform = inferPlatformFromChannel(ch.channel_slug, ch.channel_name);
+                const status = ch.analytics_status ?? "manual";
 
-                  <form action={upsertKpi}>
-                    <input type="hidden" name="content_channel_id" value={ch.content_channel_id} />
-                    <input type="hidden" name="content_item_id" value={item.content_id} />
-                    {ch.snapshot_id && (
-                      <input type="hidden" name="snapshot_id" value={ch.snapshot_id} />
+                return (
+                  <div key={ch.content_channel_id} className="space-y-3 border-t border-[var(--line)] pt-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--ink-soft)]">
+                          {ch.channel_name}
+                        </p>
+                        {platform && (
+                          <span className="chip">{platformLabel(platform)}</span>
+                        )}
+                        <span className={`chip ${statusClass(status)}`}>
+                          {analyticsStatusLabel(status)}
+                        </span>
+                        {ch.posted_url && (
+                          <a
+                            href={ch.posted_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sm font-semibold text-[var(--brand)] hover:underline"
+                          >
+                            View post ↗
+                          </a>
+                        )}
+                      </div>
+                      {ch.snapshot_id && (
+                        <DeleteKpiButton
+                          snapshotId={ch.snapshot_id}
+                          contentItemId={item.content_id}
+                        />
+                      )}
+                    </div>
+
+                    {status === "manual" && ch.analytics_error_message && (
+                      <p className="text-sm text-[var(--ink-soft)]">{ch.analytics_error_message}</p>
                     )}
-                    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                      {([
-                        ["impressions", "Impressions", ch.impressions],
-                        ["likes", "Likes", ch.likes],
-                        ["comments", "Comments", ch.comments],
-                        ["shares", "Shares", ch.shares],
-                        ["follows", "Follows", ch.follows],
-                        ["dms_or_leads", "DMs / leads", ch.dms_or_leads],
-                      ] as [string, string, number][]).map(([name, label, val]) => (
-                        <div key={name}>
-                          <label>{label}</label>
-                          <input
-                            name={name}
-                            type="number"
-                            min="0"
-                            defaultValue={val}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3">
-                      <button type="submit" className="primary-button">
-                        {ch.snapshot_id ? "Update KPIs" : "Save KPIs"}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              ))}
+
+                    <KpiInputs
+                      action={upsertKpi}
+                      contentChannelId={ch.content_channel_id}
+                      contentItemId={item.content_id}
+                      postedUrl={ch.posted_url}
+                      postAnalyticsId={ch.post_analytics_id}
+                      snapshotId={ch.snapshot_id}
+                      analyticsStatus={ch.analytics_status}
+                      initial={{
+                        impressions: ch.impressions,
+                        reach: ch.reach,
+                        views: ch.views,
+                        likes: ch.likes,
+                        comments: ch.comments,
+                        shares: ch.shares,
+                        saves: ch.saves,
+                        link_clicks: ch.link_clicks,
+                        follows: ch.follows,
+                        dms_or_leads: ch.dms_or_leads,
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
           ))}
         </section>

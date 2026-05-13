@@ -9,6 +9,7 @@ const primaryLinks = [
   ["/calendar", "Schedule"],
   ["/pipeline", "Post flow"],
   ["/kpis", "Track data"],
+  ["/analytics-sync", "Analytics Sync"],
 ];
 
 const utilityLinks = [

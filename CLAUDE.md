@@ -64,7 +64,7 @@ swap libraries without asking.
 
 ```bash
 npm install
-cp .env.example .env.local      # fill in TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, CONTENT_OS_PASSWORD
+cp .env.example .env.local      # fill in TURSO_DATABASE_URL and TURSO_AUTH_TOKEN
 npm run db:init                  # creates schema in Turso DB
 npm run db:seed                  # seeds pillars, formats, channels
 npm run dev                      # serves on 0.0.0.0:3000 (works from phone over LAN)
@@ -115,15 +115,14 @@ cadence. The system codifies that workflow:
 
 ```
 src/
-├── middleware.ts                   auth cookie gate (top-level, not under app/)
+├── middleware.ts                   public pass-through middleware
 ├── app/
 │   ├── layout.tsx                  root layout, Nav, fonts/metadata
 │   ├── page.tsx                    Dashboard (Server Component, reads DB)
 │   ├── globals.css
 │   ├── actions.ts                  shared Server Actions used across pages
 │   ├── login/
-│   │   ├── page.tsx                password input
-│   │   └── actions.ts              login action (sets cookie)
+│   │   └── page.tsx                redirects to app root
 │   ├── inbox/
 │   │   ├── page.tsx                Server Component lists ideas + sticky quick-add
 │   │   └── actions.ts              createIdea, promoteIdea, deleteIdea
@@ -152,7 +151,7 @@ src/
 │   │   └── actions.ts              upsertReview
 │   ├── settings/page.tsx           read-only info
 │   └── api/
-│       ├── auth/login/route.ts     external POST (form posts here, not action, so cookie set works cleanly)
+│       ├── auth/login/route.ts     redirects old login posts to the app
 │       └── kpis/summary/route.ts   GET ?groupBy=&range= for client-side filters on /kpis
 ├── components/
 │   ├── Nav.tsx
@@ -534,11 +533,11 @@ List of 8 formats. Click → edit hook/body/close/examples. Saves to formats tab
 
 ### `/settings`
 
-Read-only list of channels (with brand). Note about password reset (env var). Display TURSO DB URL host (not the full token).
+Read-only list of channels (with brand). Display TURSO DB URL host (not the full token).
 
 ### `/login`
 
-Single password input. POST to `/api/auth/login` → sets `content_os_session` cookie (httpOnly, Secure, SameSite=Lax, 30d). Redirects to `/`.
+Redirects to `/`. The app no longer has a password gate.
 
 ## Business rules
 
@@ -553,12 +552,10 @@ Single password input. POST to `/api/auth/login` → sets `content_os_session` c
 - **Idea promotion**: `POST /api/ideas/[id]/promote` creates a `content_items` row (status=`drafting`, copies title, suggested_format, suggested_pillar), updates idea to `status=promoted`, returns new content id.
 - **Multi-channel posting**: one `content_items` row links to N `content_channels` rows. Each tracks its own `scheduled_at`, `posted_at`, `posted_url`. KPIs are per `content_channel`, not per `content_item`. A Reel published to IG, TikTok, and YT Shorts = 3 `content_channels` + 3 KPI streams.
 
-## Auth (single-user, simple)
+## Auth
 
-- Env var `CONTENT_OS_PASSWORD`.
-- `/login` POSTs the password to `/api/auth/login` which compares against env and, on match, sets `content_os_session` cookie containing a signed timestamp (HMAC with `CONTENT_OS_SESSION_SECRET`).
-- `src/middleware.ts` checks the cookie on every route except `/login` and `/api/auth/login`. No cookie → 302 to `/login`.
-- 30-day cookie expiry, httpOnly, Secure (in prod), SameSite=Lax.
+- The app is public to anyone with the deployment URL.
+- `/login` and `/api/auth/login` redirect to `/` for old links and stale bookmarks.
 
 ## Conventions
 
@@ -598,7 +595,6 @@ Build top-down by user value. Don't move on until each step works end-to-end.
 - [ ] Log weekly KPIs across all posted channels in under 5 minutes
 - [ ] Dashboard shows which formats / pillars / channels perform best last 30 days
 - [ ] Weekly review captures what worked / didn't / next focus
-- [ ] Single-password gate works on Vercel prod
 - [ ] App is usable on phone (no horizontal scroll, tap targets ≥44px)
 
 ## Deployment
@@ -613,8 +609,6 @@ Build top-down by user value. Don't move on until each step works end-to-end.
 3. **Vercel**: import repo. Set env vars:
    - `TURSO_DATABASE_URL`
    - `TURSO_AUTH_TOKEN`
-   - `CONTENT_OS_PASSWORD`
-   - `CONTENT_OS_SESSION_SECRET` (32+ random bytes)
 4. **Init prod DB**: run `npm run db:init && npm run db:seed` locally with prod env vars in `.env.local`. (One-shot.)
 5. Custom domain optional.
 

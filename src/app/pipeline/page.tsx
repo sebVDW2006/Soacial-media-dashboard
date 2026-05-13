@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { Kanban } from "@/components/Kanban";
 import { moveStatus } from "@/app/pipeline/actions";
-import { markPosted, saveChannelSchedule } from "@/app/content/actions";
+import { markPosted } from "@/app/content/actions";
 import { getContentItems, getScheduledAndPostedItems } from "@/lib/queries";
+import { inferPlatformFromChannel, platformLabel } from "@/lib/social";
+import {
+  ContentTypeBadge,
+  StorytellingStructureBadge,
+  SubPillarBadge,
+} from "@/components/TaxonomyBadges";
 
 type PipelinePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -52,6 +58,9 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
           title: row.title,
           status: row.status,
           brand: row.brand,
+          content_type: row.content_type,
+          sub_pillar: row.sub_pillar,
+          storytelling_structure: row.storytelling_structure,
           format_name: row.format_name,
           pillar_name: row.pillar_name,
           target_post_at: row.target_post_at,
@@ -62,11 +71,11 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
       {/* Step 1 — Mark as posted */}
       {unpostedItems.length > 0 && (
         <section className="app-card space-y-4 p-6 sm:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="sub-title">Step 1 — Mark as posted</h2>
-              <p className="muted mt-1 text-sm">Hit the button for each channel once it is live. URL is optional but useful for tracking.</p>
-            </div>
+          <div>
+            <h2 className="sub-title">Step 1 — Mark as posted</h2>
+            <p className="muted mt-1 text-sm">
+              Paste the post URL (optional — useful for jumping back later) and tap mark posted.
+            </p>
           </div>
           {unpostedItems.map((item) => (
             <div key={item.content_id} className="soft-card space-y-4 p-5">
@@ -79,39 +88,45 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
                   <span className="text-sm text-[var(--ink-soft)]">{item.target_post_at.slice(0, 10)}</span>
                 )}
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {item.channels
                   .filter((ch) => ch.channel_status !== "posted")
-                  .map((ch) => (
-                    <div key={ch.content_channel_id} className="space-y-2">
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--ink-soft)]">
-                        {ch.channel_name}
-                      </p>
-                      {/* URL field (optional) */}
-                      <form action={saveChannelSchedule} className="flex gap-2">
+                  .map((ch) => {
+                    const platform = inferPlatformFromChannel(ch.channel_slug, ch.channel_name);
+
+                    return (
+                      <form
+                        key={ch.content_channel_id}
+                        action={markPosted}
+                        className="space-y-3 rounded-[22px] border border-[var(--line)] bg-white/60 p-4"
+                      >
                         <input type="hidden" name="content_channel_id" value={ch.content_channel_id} />
                         <input type="hidden" name="content_item_id" value={item.content_id} />
-                        <input type="hidden" name="scheduled_at" value={ch.scheduled_at ?? ""} />
-                        <input
-                          name="posted_url"
-                          defaultValue={ch.posted_url ?? ""}
-                          placeholder="Post URL (optional)"
-                          className="min-w-0 flex-1 text-sm"
-                        />
-                        <button type="submit" className="secondary-button shrink-0 text-sm">
-                          Save
-                        </button>
-                      </form>
-                      {/* Mark posted button (no URL required) */}
-                      <form action={markPosted}>
-                        <input type="hidden" name="content_channel_id" value={ch.content_channel_id} />
-                        <input type="hidden" name="content_item_id" value={item.content_id} />
+
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--ink-soft)]">
+                            {ch.channel_name}
+                          </p>
+                          {platform && <span className="chip">{platformLabel(platform)}</span>}
+                        </div>
+
+                        <div>
+                          <label htmlFor={`posted_url_${ch.content_channel_id}`}>Post URL (optional)</label>
+                          <input
+                            id={`posted_url_${ch.content_channel_id}`}
+                            name="posted_url"
+                            type="url"
+                            defaultValue={ch.posted_url ?? ""}
+                            placeholder="https://..."
+                          />
+                        </div>
+
                         <button type="submit" className="primary-button w-full">
                           ✓ Mark posted
                         </button>
                       </form>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           ))}
@@ -164,17 +179,22 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
               <input type="hidden" name="id" value={row.id} />
               <div>
                 <p className="font-semibold">{row.title}</p>
-                <p className="text-sm text-[var(--ink-soft)]">
-                  {row.format_name} • {row.pillar_name}
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <ContentTypeBadge contentType={row.content_type} />
+                  <SubPillarBadge subPillar={row.sub_pillar} />
+                  <StorytellingStructureBadge structure={row.storytelling_structure} />
+                </div>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  Framework: {row.format_name}
                 </p>
               </div>
               <select name="status" defaultValue={row.status}>
                 <option value="idea">Idea</option>
                 <option value="drafting">Drafting</option>
-                <option value="captured">Captured</option>
+                <option value="ready">Ready</option>
                 <option value="scheduled">Scheduled</option>
                 <option value="posted">Posted</option>
-                <option value="tracked">Tracked</option>
+                <option value="repurpose">Repurpose</option>
               </select>
               <button type="submit" className="secondary-button">
                 Update

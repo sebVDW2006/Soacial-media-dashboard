@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import { aggregateKpis } from "@/lib/kpi";
+import { mergeAccountSlots } from "@/lib/social";
 import { getCurrentWeek, getWeekTuesday, weekRange } from "@/lib/week";
 import type {
   Asset,
@@ -9,9 +10,15 @@ import type {
   ContentChannelDetail,
   ContentItem,
   ContentListItem,
+  ContentType,
   Format,
   Idea,
   Pillar,
+  SafeSocialAccount,
+  SocialAccountType,
+  SocialAnalyticsStatus,
+  SocialConnectionStatus,
+  SocialPlatform,
   WeeklyReview,
 } from "@/lib/types";
 
@@ -20,7 +27,7 @@ type RowsResult = {
 };
 
 function rowsAs<T>(result: RowsResult) {
-  return result.rows as unknown as T[];
+  return result.rows.map((row) => ({ ...(row as Record<string, unknown>) })) as T[];
 }
 
 function firstRowAs<T>(result: RowsResult) {
@@ -87,6 +94,7 @@ export type ContentStatusGroup =
   | "ready"
   | "scheduled"
   | "posted"
+  | "repurpose"
   | "archived";
 
 export type GetContentItemsOptions = {
@@ -96,15 +104,19 @@ export type GetContentItemsOptions = {
   formatId?: number | null;
   pillarId?: number | null;
   channelId?: number | null;
+  contentType?: ContentType | "all" | null;
+  subPillar?: string | null;
+  weekIso?: string | null;
   sort?: ContentSortKey;
 };
 
 const STATUS_GROUP_TO_STATUSES: Record<ContentStatusGroup, string[]> = {
   all: [],
   draft: ["idea", "drafting"],
-  ready: ["captured"],
+  ready: ["ready", "captured"],
   scheduled: ["scheduled"],
   posted: ["posted", "tracked"],
+  repurpose: ["repurpose"],
   archived: [],
 };
 
@@ -165,6 +177,21 @@ export async function getContentItems(options?: GetContentItemsOptions | Brand |
     args.push(opts.channelId);
   }
 
+  if (opts.contentType && opts.contentType !== "all") {
+    conditions.push("ci.content_type = ?");
+    args.push(opts.contentType);
+  }
+
+  if (opts.subPillar) {
+    conditions.push("ci.sub_pillar = ?");
+    args.push(opts.subPillar);
+  }
+
+  if (opts.weekIso) {
+    conditions.push("ci.week_iso = ?");
+    args.push(opts.weekIso);
+  }
+
   if (search) {
     const like = `%${search}%`;
     conditions.push(
@@ -181,7 +208,8 @@ export async function getContentItems(options?: GetContentItemsOptions | Brand |
 
   const result = await db.execute({
     sql: `SELECT ci.*, f.name AS format_name, p.name AS pillar_name,
-        GROUP_CONCAT(ch.name, ', ') AS channel_names
+        GROUP_CONCAT(ch.name, ', ') AS channel_names,
+        GROUP_CONCAT(ch.slug, ',') AS channel_slugs
       FROM content_items ci
       INNER JOIN formats f ON f.id = ci.format_id
       INNER JOIN pillars p ON p.id = ci.pillar_id
@@ -195,7 +223,28 @@ export async function getContentItems(options?: GetContentItemsOptions | Brand |
   return rowsAs<ContentListItem>(result);
 }
 
-export async function getContentStatusCounts(options?: Omit<GetContentItemsOptions, "statusGroup" | "sort">) {
+export type WeeklyContentTypeCount = {
+  week_iso: string;
+  brand: Brand;
+  content_type: ContentType | null;
+  count: number;
+};
+
+export async function getWeeklyContentTypeBalance(weekIso: string) {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT week_iso, brand, content_type, COUNT(*) AS count
+      FROM content_items
+      WHERE archived = 0 AND week_iso = ?
+      GROUP BY week_iso, brand, content_type`,
+    args: [weekIso],
+  });
+  return rowsAs<WeeklyContentTypeCount>(result);
+}
+
+export async function getContentStatusCounts(
+  options?: Omit<GetContentItemsOptions, "statusGroup" | "sort">,
+) {
   const db = await getDb();
   const brand = normalizeBrandFilter(options?.brand);
   const search = options?.search?.trim() || null;
@@ -217,6 +266,18 @@ export async function getContentStatusCounts(options?: Omit<GetContentItemsOptio
     );
     args.push(options.channelId);
   }
+  if (options?.contentType && options.contentType !== "all") {
+    conditions.push("ci.content_type = ?");
+    args.push(options.contentType);
+  }
+  if (options?.subPillar) {
+    conditions.push("ci.sub_pillar = ?");
+    args.push(options.subPillar);
+  }
+  if (options?.weekIso) {
+    conditions.push("ci.week_iso = ?");
+    args.push(options.weekIso);
+  }
   if (search) {
     const like = `%${search}%`;
     conditions.push(
@@ -235,9 +296,10 @@ export async function getContentStatusCounts(options?: Omit<GetContentItemsOptio
     sql: `SELECT
         SUM(CASE WHEN ci.archived = 0 THEN 1 ELSE 0 END) AS all_count,
         SUM(CASE WHEN ci.archived = 0 AND ci.status IN ('idea', 'drafting') THEN 1 ELSE 0 END) AS draft_count,
-        SUM(CASE WHEN ci.archived = 0 AND ci.status = 'captured' THEN 1 ELSE 0 END) AS ready_count,
+        SUM(CASE WHEN ci.archived = 0 AND ci.status IN ('ready', 'captured') THEN 1 ELSE 0 END) AS ready_count,
         SUM(CASE WHEN ci.archived = 0 AND ci.status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled_count,
         SUM(CASE WHEN ci.archived = 0 AND ci.status IN ('posted', 'tracked') THEN 1 ELSE 0 END) AS posted_count,
+        SUM(CASE WHEN ci.archived = 0 AND ci.status = 'repurpose' THEN 1 ELSE 0 END) AS repurpose_count,
         SUM(CASE WHEN ci.archived = 1 THEN 1 ELSE 0 END) AS archived_count
       FROM content_items ci
       INNER JOIN formats f ON f.id = ci.format_id
@@ -254,6 +316,7 @@ export async function getContentStatusCounts(options?: Omit<GetContentItemsOptio
     ready: toNum("ready_count"),
     scheduled: toNum("scheduled_count"),
     posted: toNum("posted_count"),
+    repurpose: toNum("repurpose_count"),
     archived: toNum("archived_count"),
   };
 }
@@ -300,19 +363,20 @@ export async function getScheduledRange(start: string, end: string) {
   const db = await getDb();
   const result = await db.execute({
     sql: `SELECT
-        cc.id AS content_channel_id,
+        COALESCE(cc.id, -ci.id) AS content_channel_id,
         cc.scheduled_at,
-        ch.brand,
-        ch.name AS channel_name,
-        ch.slug AS channel_slug,
+        COALESCE(ch.brand, ci.brand) AS brand,
+        COALESCE(ch.name, 'No channel assigned') AS channel_name,
+        COALESCE(ch.slug, 'unassigned') AS channel_slug,
         ci.id AS content_id,
         ci.title,
         ci.status,
         ci.target_post_at
-      FROM content_channels cc
-      INNER JOIN channels ch ON ch.id = cc.channel_id
-      INNER JOIN content_items ci ON ci.id = cc.content_item_id
-      WHERE substr(COALESCE(cc.scheduled_at, ci.target_post_at, ''), 1, 10) BETWEEN ? AND ?
+      FROM content_items ci
+      LEFT JOIN content_channels cc ON cc.content_item_id = ci.id
+      LEFT JOIN channels ch ON ch.id = cc.channel_id
+      WHERE ci.archived = 0
+        AND substr(COALESCE(cc.scheduled_at, ci.target_post_at), 1, 10) BETWEEN ? AND ?
       ORDER BY COALESCE(cc.scheduled_at, ci.target_post_at) ASC`,
     args: [start, end],
   });
@@ -335,19 +399,20 @@ export async function getScheduledWeek(isoWeek = getCurrentWeek()) {
   const range = weekRange(isoWeek);
   const result = await db.execute({
     sql: `SELECT
-        cc.id AS content_channel_id,
+        COALESCE(cc.id, -ci.id) AS content_channel_id,
         cc.scheduled_at,
-        ch.brand,
-        ch.name AS channel_name,
-        ch.slug AS channel_slug,
+        COALESCE(ch.brand, ci.brand) AS brand,
+        COALESCE(ch.name, 'No channel assigned') AS channel_name,
+        COALESCE(ch.slug, 'unassigned') AS channel_slug,
         ci.id AS content_id,
         ci.title,
         ci.status,
         ci.target_post_at
-      FROM content_channels cc
-      INNER JOIN channels ch ON ch.id = cc.channel_id
-      INNER JOIN content_items ci ON ci.id = cc.content_item_id
-      WHERE substr(COALESCE(cc.scheduled_at, ci.target_post_at, ''), 1, 10) BETWEEN ? AND ?
+      FROM content_items ci
+      LEFT JOIN content_channels cc ON cc.content_item_id = ci.id
+      LEFT JOIN channels ch ON ch.id = cc.channel_id
+      WHERE ci.archived = 0
+        AND substr(COALESCE(cc.scheduled_at, ci.target_post_at), 1, 10) BETWEEN ? AND ?
       ORDER BY COALESCE(cc.scheduled_at, ci.target_post_at) ASC`,
     args: [range.start, range.end],
   });
@@ -599,7 +664,8 @@ export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
         cc.scheduled_at,
         cc.posted_url,
         cc.status AS channel_status,
-        ch.name AS channel_name
+        ch.name AS channel_name,
+        ch.slug AS channel_slug
       FROM content_items ci
       INNER JOIN content_channels cc ON cc.content_item_id = ci.id
       INNER JOIN channels ch ON ch.id = cc.channel_id
@@ -619,6 +685,7 @@ export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
     channels: Array<{
       content_channel_id: number;
       channel_name: string;
+      channel_slug: string;
       scheduled_at: string | null;
       posted_url: string | null;
       channel_status: string;
@@ -640,6 +707,7 @@ export async function getScheduledAndPostedItems(filterBrand?: Brand | "all") {
     map.get(id)!.channels.push({
       content_channel_id: Number(row.content_channel_id),
       channel_name: String(row.channel_name ?? ""),
+      channel_slug: String(row.channel_slug ?? ""),
       scheduled_at: row.scheduled_at ? String(row.scheduled_at) : null,
       posted_url: row.posted_url ? String(row.posted_url) : null,
       channel_status: String(row.channel_status ?? ""),
@@ -696,16 +764,25 @@ export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
         cc.id AS content_channel_id,
         cc.posted_url,
         ch.name AS channel_name,
+        ch.slug AS channel_slug,
+        pa.id AS post_analytics_id,
+        pa.status AS analytics_status,
+        pa.error_message AS analytics_error_message,
         ks.id AS snapshot_id,
         ks.impressions,
+        ks.reach,
+        ks.views,
         ks.likes,
         ks.comments,
         ks.shares,
+        ks.saves,
+        ks.link_clicks,
         ks.follows,
         ks.dms_or_leads
       FROM content_items ci
       INNER JOIN content_channels cc ON cc.content_item_id = ci.id
       INNER JOIN channels ch ON ch.id = cc.channel_id
+      LEFT JOIN post_analytics pa ON pa.post_id = cc.id
       LEFT JOIN kpi_snapshots ks ON ks.content_channel_id = cc.id
         AND ks.captured_at = (
           SELECT MAX(captured_at) FROM kpi_snapshots WHERE content_channel_id = cc.id
@@ -724,12 +801,20 @@ export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
     channels: Array<{
       content_channel_id: number;
       channel_name: string;
+      channel_slug: string;
       posted_url: string | null;
+      post_analytics_id: number | null;
+      analytics_status: SocialAnalyticsStatus | null;
+      analytics_error_message: string | null;
       snapshot_id: number | null;
       impressions: number;
+      reach: number;
+      views: number;
       likes: number;
       comments: number;
       shares: number;
+      saves: number;
+      link_clicks: number;
       follows: number;
       dms_or_leads: number;
     }>;
@@ -748,12 +833,20 @@ export async function getPostedItemsWithChannels(filterBrand?: Brand | "all") {
     map.get(id)!.channels.push({
       content_channel_id: Number(row.content_channel_id),
       channel_name: String(row.channel_name ?? ""),
+      channel_slug: String(row.channel_slug ?? ""),
       posted_url: row.posted_url ? String(row.posted_url) : null,
+      post_analytics_id: row.post_analytics_id ? Number(row.post_analytics_id) : null,
+      analytics_status: row.analytics_status ? (String(row.analytics_status) as SocialAnalyticsStatus) : null,
+      analytics_error_message: row.analytics_error_message ? String(row.analytics_error_message) : null,
       snapshot_id: row.snapshot_id ? Number(row.snapshot_id) : null,
       impressions: Number(row.impressions ?? 0),
+      reach: Number(row.reach ?? 0),
+      views: Number(row.views ?? 0),
       likes: Number(row.likes ?? 0),
       comments: Number(row.comments ?? 0),
       shares: Number(row.shares ?? 0),
+      saves: Number(row.saves ?? 0),
+      link_clicks: Number(row.link_clicks ?? 0),
       follows: Number(row.follows ?? 0),
       dms_or_leads: Number(row.dms_or_leads ?? 0),
     });
@@ -794,4 +887,193 @@ export async function getTopKpiPosts(days = 30) {
     title: string;
     total_engagement: number;
   }>(result);
+}
+
+function rowText(value: unknown) {
+  return value == null ? null : String(value);
+}
+
+function rowNumber(value: unknown) {
+  const next = Number(value ?? 0);
+  return Number.isFinite(next) ? next : 0;
+}
+
+function engagementTotal(row: {
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  clicks: number;
+}) {
+  return row.likes + row.comments + row.shares + row.saves + row.clicks;
+}
+
+export async function getSocialAccountSlots() {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT
+        id,
+        brand,
+        platform,
+        account_type,
+        display_name,
+        handle,
+        external_account_id,
+        token_expires_at,
+        connection_status,
+        last_synced_at,
+        created_at,
+        updated_at
+      FROM social_accounts
+      ORDER BY brand, platform, account_type`,
+    args: [],
+  });
+
+  const accounts = result.rows.map((row) => ({
+    id: rowNumber(row.id),
+    brand: (rowText(row.brand) === "ublend" ? "ublend" : "seb") as Brand,
+    platform: (rowText(row.platform) === "linkedin" ? "linkedin" : "instagram") as SocialPlatform,
+    account_type: rowText(row.account_type) as SocialAccountType,
+    display_name: rowText(row.display_name) ?? "",
+    handle: rowText(row.handle),
+    external_account_id: rowText(row.external_account_id),
+    token_expires_at: rowText(row.token_expires_at),
+    connection_status: (rowText(row.connection_status) ?? "needs_review") as SocialConnectionStatus,
+    last_synced_at: rowText(row.last_synced_at),
+    created_at: rowText(row.created_at) ?? "",
+    updated_at: rowText(row.updated_at) ?? "",
+  })) satisfies SafeSocialAccount[];
+
+  return mergeAccountSlots(accounts);
+}
+
+export type SocialAnalyticsOverviewRow = {
+  id: number;
+  content_id: number;
+  title: string;
+  brand: Brand;
+  platform: SocialPlatform;
+  status: SocialAnalyticsStatus;
+  last_synced_at: string | null;
+  accountLabel: string;
+  metrics: {
+    impressions: number;
+    reach: number;
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+    saves: number;
+    clicks: number;
+    engagementRate: number;
+  };
+};
+
+export async function getSocialAnalyticsOverview(filterBrand?: Brand | "all") {
+  const db = await getDb();
+  const brand = normalizeBrandFilter(filterBrand);
+  const result = await db.execute({
+    sql: `SELECT
+        pa.id,
+        cc.content_item_id AS content_id,
+        ci.title,
+        pa.brand,
+        pa.platform,
+        pa.status,
+        pa.last_synced_at,
+        pa.impressions,
+        pa.reach,
+        pa.views,
+        pa.likes,
+        pa.comments,
+        pa.shares,
+        pa.saves,
+        pa.clicks,
+        pa.engagement_rate,
+        COALESCE(sa.display_name, ch.name) AS account_label
+      FROM post_analytics pa
+      INNER JOIN content_channels cc ON cc.id = pa.post_id
+      INNER JOIN content_items ci ON ci.id = cc.content_item_id
+      INNER JOIN channels ch ON ch.id = cc.channel_id
+      LEFT JOIN social_accounts sa ON sa.id = pa.social_account_id
+      WHERE (? IS NULL OR pa.brand = ?)
+      ORDER BY COALESCE(pa.last_synced_at, pa.updated_at, pa.created_at) DESC, pa.id DESC`,
+    args: [brand, brand],
+  });
+
+  const rows: SocialAnalyticsOverviewRow[] = result.rows.map((row) => {
+    const likes = rowNumber(row.likes);
+    const comments = rowNumber(row.comments);
+    const shares = rowNumber(row.shares);
+    const saves = rowNumber(row.saves);
+    const clicks = rowNumber(row.clicks);
+
+    return {
+      id: rowNumber(row.id),
+      content_id: rowNumber(row.content_id),
+      title: rowText(row.title) ?? "Untitled post",
+      brand: (rowText(row.brand) === "ublend" ? "ublend" : "seb") as Brand,
+      platform: (rowText(row.platform) === "linkedin" ? "linkedin" : "instagram") as SocialPlatform,
+      status: (rowText(row.status) ?? "not_connected") as SocialAnalyticsStatus,
+      last_synced_at: rowText(row.last_synced_at),
+      accountLabel: rowText(row.account_label) ?? "Unassigned account",
+      metrics: {
+        impressions: rowNumber(row.impressions),
+        reach: rowNumber(row.reach),
+        views: rowNumber(row.views),
+        likes,
+        comments,
+        shares,
+        saves,
+        clicks,
+        engagementRate: rowNumber(row.engagement_rate),
+      },
+    };
+  });
+
+  const totals = rows.reduce(
+    (acc, row) => {
+      acc.impressions += row.metrics.impressions;
+      acc.reach += row.metrics.reach;
+      acc.views += row.metrics.views;
+      acc.engagement += engagementTotal(row.metrics);
+      return acc;
+    },
+    { impressions: 0, reach: 0, views: 0, engagement: 0 },
+  );
+  const denominator = totals.reach || totals.impressions || totals.views;
+  const averageEngagementRate = denominator
+    ? Number(((totals.engagement / denominator) * 100).toFixed(2))
+    : 0;
+
+  const bestPost =
+    rows
+      .map((row) => ({ label: row.title, value: engagementTotal(row.metrics) }))
+      .sort((a, b) => b.value - a.value)[0] ?? null;
+
+  const platformTotals = new Map<SocialPlatform, number>();
+  const accountTotals = new Map<string, number>();
+  for (const row of rows) {
+    const engagement = engagementTotal(row.metrics);
+    platformTotals.set(row.platform, (platformTotals.get(row.platform) ?? 0) + engagement);
+    accountTotals.set(row.accountLabel, (accountTotals.get(row.accountLabel) ?? 0) + engagement);
+  }
+
+  const bestPlatform =
+    Array.from(platformTotals.entries())
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)[0] ?? null;
+  const bestAccount =
+    Array.from(accountTotals.entries())
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)[0] ?? null;
+
+  return {
+    rows,
+    totals,
+    averageEngagementRate,
+    bestPost,
+    bestPlatform,
+    bestAccount,
+  };
 }

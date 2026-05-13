@@ -1,13 +1,41 @@
 export type Brand = "seb" | "ublend";
+export type SocialPlatform = "instagram" | "linkedin";
+export type SocialAccountType =
+  | "instagram_business"
+  | "instagram_creator"
+  | "linkedin_page"
+  | "linkedin_member";
+export type SocialConnectionStatus =
+  | "connected"
+  | "expired"
+  | "needs_review"
+  | "manual_only";
+export type SocialAnalyticsStatus =
+  | "not_connected"
+  | "connected"
+  | "syncing"
+  | "synced"
+  | "failed"
+  | "manual";
 
 export type IdeaStatus = "idea" | "promoted" | "dropped";
 export type ContentStatus =
   | "idea"
   | "drafting"
-  | "captured"
+  | "ready"
   | "scheduled"
   | "posted"
-  | "tracked";
+  | "repurpose";
+
+export type ContentType = "educational" | "storytelling" | "authority";
+
+export type StorytellingStructure =
+  | "big_goal_dream"
+  | "challenge"
+  | "breakthrough"
+  | "about_me"
+  | "heroes_journey"
+  | "man_in_a_hole";
 export type ChannelStatus = "planned" | "scheduled" | "posted";
 export type CaptureStatus = "planned" | "done";
 export type AssetKind =
@@ -59,8 +87,16 @@ export type Idea = {
 };
 
 export type PostType =
-  | "single-image"
+  | "linkedin-text-post"
   | "carousel"
+  | "reel-short"
+  | "photo-post"
+  | "document-post"
+  | "case-study-post"
+  | "thread"
+  | "email-outreach"
+  // Legacy values kept for back-compat reads; new writes use the values above.
+  | "single-image"
   | "reel"
   | "story"
   | "short-video"
@@ -74,6 +110,9 @@ export type ContentItem = {
   format_id: number;
   pillar_id: number;
   brand: Brand;
+  content_type: ContentType | null;
+  sub_pillar: string | null;
+  storytelling_structure: StorytellingStructure | null;
   post_type: PostType;
   hook: string | null;
   body: string | null;
@@ -83,6 +122,8 @@ export type ContentItem = {
   week_iso: string | null;
   notes: string | null;
   archived: number;
+  performance_metrics: string | null;
+  posted_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -130,6 +171,7 @@ export type ContentListItem = ContentItem & {
   format_name: string;
   pillar_name: string;
   channel_names: string | null;
+  channel_slugs: string | null;
 };
 
 export type ContentChannelDetail = ContentChannel & {
@@ -142,3 +184,40 @@ export type AssetWithLinks = Asset & {
   linked_content_titles?: string | null;
 };
 
+export type SafeSocialAccount = {
+  id: number;
+  brand: Brand;
+  platform: SocialPlatform;
+  account_type: SocialAccountType;
+  display_name: string;
+  handle: string | null;
+  external_account_id: string | null;
+  token_expires_at: string | null;
+  connection_status: SocialConnectionStatus;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SocialAccountSlot = {
+  key: string;
+  brand: Brand;
+  platform: SocialPlatform;
+  account_type: SocialAccountType;
+  displayName: string;
+  handle: string;
+  account: SafeSocialAccount | null;
+};
+
+export type PostAnalyticsMetrics = {
+  impressions: number;
+  reach: number;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  clicks: number;
+  engagementRate: number;
+  followerGrowthFromPost: number;
+};

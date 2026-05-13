@@ -151,13 +151,41 @@ async function syncAssets(contentItemId: number, assetIds: number[]) {
   }
 }
 
+const CONTENT_TYPE_VALUES = new Set(["educational", "storytelling", "authority"]);
+const STORYTELLING_STRUCTURE_VALUES = new Set([
+  "big_goal_dream",
+  "challenge",
+  "breakthrough",
+  "about_me",
+  "heroes_journey",
+  "man_in_a_hole",
+]);
+
+function parseContentType(value: FormDataEntryValue | null): string | null {
+  const text = parseText(value);
+  if (!text) return null;
+  return CONTENT_TYPE_VALUES.has(text) ? text : null;
+}
+
+function parseStorytellingStructure(value: FormDataEntryValue | null): string | null {
+  const text = parseText(value);
+  if (!text) return null;
+  return STORYTELLING_STRUCTURE_VALUES.has(text) ? text : null;
+}
+
 export async function upsertContent(formData: FormData) {
   const id = parseNullableInteger(formData.get("id"));
   const title = parseText(formData.get("title"));
   const formatId = parseInteger(formData.get("format_id"));
   const pillarId = parseInteger(formData.get("pillar_id"));
   const brand = parseText(formData.get("brand"));
-  const postType = parseText(formData.get("post_type")) ?? "single-image";
+  const postType = parseText(formData.get("post_type")) ?? "linkedin-text-post";
+  const contentType = parseContentType(formData.get("content_type"));
+  const subPillar = parseText(formData.get("sub_pillar"));
+  const storytellingStructure = parseStorytellingStructure(
+    formData.get("storytelling_structure"),
+  );
+  const status = parseText(formData.get("status"));
   const hook = parseText(formData.get("hook"));
   const body = parseText(formData.get("body"));
   const close = parseText(formData.get("close"));
@@ -192,17 +220,32 @@ export async function upsertContent(formData: FormData) {
   if (id) {
     await db.execute({
       sql: `UPDATE content_items
-        SET title = ?, format_id = ?, pillar_id = ?, brand = ?, post_type = ?, hook = ?, body = ?, close = ?,
-            target_post_at = ?, week_iso = ?, notes = ?, updated_at = datetime('now')
+        SET title = ?, format_id = ?, pillar_id = ?, brand = ?, content_type = ?, sub_pillar = ?,
+            storytelling_structure = ?,
+            post_type = ?, hook = ?, body = ?, close = ?,
+            target_post_at = ?, week_iso = ?, notes = ?,
+            status = COALESCE(?, status),
+            updated_at = datetime('now')
         WHERE id = ?`,
-      args: [title, formatId, pillarId, brand, postType, hook, body, close, targetPostAt, weekIso, notes, id],
+      args: [
+        title, formatId, pillarId, brand, contentType, subPillar,
+        storytellingStructure,
+        postType, hook, body, close,
+        targetPostAt, weekIso, notes,
+        status,
+        id,
+      ],
     });
   } else {
     const result = await db.execute({
       sql: `INSERT INTO content_items
-        (title, format_id, pillar_id, brand, post_type, hook, body, close, status, target_post_at, week_iso, notes, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'drafting', ?, ?, ?, datetime('now'), datetime('now'))`,
-      args: [title, formatId, pillarId, brand, postType, hook, body, close, targetPostAt, weekIso, notes],
+        (title, format_id, pillar_id, brand, content_type, sub_pillar, storytelling_structure, post_type,
+         hook, body, close, status, target_post_at, week_iso, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 'drafting'), ?, ?, ?, datetime('now'), datetime('now'))`,
+      args: [
+        title, formatId, pillarId, brand, contentType, subPillar, storytellingStructure, postType,
+        hook, body, close, status, targetPostAt, weekIso, notes,
+      ],
     });
     contentId = Number(result.lastInsertRowid);
   }

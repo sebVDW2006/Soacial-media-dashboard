@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Brand, Channel, ContentItem, Format, Pillar, PostType } from "@/lib/types";
+import type {
+  Brand,
+  Channel,
+  ContentItem,
+  ContentType,
+  Format,
+  Pillar,
+  PostType,
+  StorytellingStructure,
+} from "@/lib/types";
 import { PILLAR_BRAND_SLUGS, formatChannelDefaults } from "@/components/content-form/constants";
 import {
   buildInitialDraft,
@@ -12,6 +21,7 @@ import {
   serializeDraft,
   type DraftFields,
 } from "@/components/content-form/draft";
+import { getSubPillarsForBrand } from "@/lib/taxonomy";
 
 type UseContentFormDraftArgs = {
   item?: ContentItem | null;
@@ -26,6 +36,9 @@ type UseContentFormDraftArgs = {
   initialChannelIds?: number[];
   initialPostType?: PostType;
   initialTargetPostAt?: string | null;
+  initialContentType?: ContentType | null;
+  initialSubPillar?: string | null;
+  initialStorytellingStructure?: StorytellingStructure | null;
 };
 
 function pickChannelSchedules(channelIds: number[], channelSchedules: Record<number, string>) {
@@ -51,6 +64,9 @@ export function useContentFormDraft(args: UseContentFormDraftArgs) {
     initialChannelIds,
     initialPostType,
     initialTargetPostAt,
+    initialContentType,
+    initialSubPillar,
+    initialStorytellingStructure,
   } = args;
   const formatLookup = useMemo(
     () => new Map(formats.map((format) => [format.id, format])),
@@ -69,6 +85,9 @@ export function useContentFormDraft(args: UseContentFormDraftArgs) {
           initialChannelIds,
           initialPostType,
           initialTargetPostAt,
+          initialContentType,
+          initialSubPillar,
+          initialStorytellingStructure,
         },
         formats,
         pillars,
@@ -79,9 +98,12 @@ export function useContentFormDraft(args: UseContentFormDraftArgs) {
       formats,
       initialBrand,
       initialChannelIds,
+      initialContentType,
       initialFormatId,
       initialPillarId,
       initialPostType,
+      initialStorytellingStructure,
+      initialSubPillar,
       initialTargetPostAt,
       item,
       linkedChannelIds,
@@ -100,6 +122,10 @@ export function useContentFormDraft(args: UseContentFormDraftArgs) {
   const visiblePillars = useMemo(
     () => pillars.filter((pillar) => PILLAR_BRAND_SLUGS[draft.brand].includes(pillar.slug)),
     [draft.brand, pillars],
+  );
+  const visibleSubPillars = useMemo(
+    () => getSubPillarsForBrand(draft.brand),
+    [draft.brand],
   );
   const resolvedTargetPostAt = useMemo(() => getResolvedTargetPostAt(draft), [draft]);
   const currentDraftSignature = useMemo(() => serializeDraft(draft), [draft]);
@@ -196,10 +222,17 @@ export function useContentFormDraft(args: UseContentFormDraftArgs) {
           : (pillars.find((pillar) => PILLAR_BRAND_SLUGS[nextBrand].includes(pillar.slug))?.id ??
             current.pillarId);
 
+      const subPillarsForNextBrand = getSubPillarsForBrand(nextBrand);
+      const nextSubPillar =
+        current.subPillar && subPillarsForNextBrand.some((sp) => sp.slug === current.subPillar)
+          ? current.subPillar
+          : null;
+
       return {
         ...current,
         brand: nextBrand,
         pillarId: nextPillarId,
+        subPillar: nextSubPillar,
         selectedChannels,
         channelSchedules: pickChannelSchedules(selectedChannels, current.channelSchedules),
       };
@@ -248,6 +281,7 @@ export function useContentFormDraft(args: UseContentFormDraftArgs) {
   return {
     draft,
     visiblePillars,
+    visibleSubPillars,
     resolvedTargetPostAt,
     backupLabel,
     recoveredDraftAt,

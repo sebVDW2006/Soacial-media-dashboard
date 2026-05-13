@@ -2,8 +2,12 @@ import { ContentForm } from "@/components/ContentForm";
 import { WeeklyPlanSidebar } from "@/components/WeeklyPlanSidebar";
 import { upsertContent } from "@/app/content/actions";
 import { getAssets, getReferenceData } from "@/lib/queries";
-import type { PostType } from "@/lib/types";
+import type { ContentType, PostType } from "@/lib/types";
 import { getISOWeek } from "@/lib/week";
+import {
+  ALL_SUB_PILLARS,
+  CONTENT_TYPES,
+} from "@/lib/taxonomy";
 
 type NewContentPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -18,6 +22,8 @@ export default async function NewContentPage({ searchParams }: NewContentPagePro
   const initialBrand =
     typeof params.brand === "string" && params.brand === "ublend" ? "ublend" : "seb";
   const initialDate = typeof params.date === "string" ? params.date : undefined;
+  const pendingDraftChannelSlug =
+    typeof params.channel === "string" ? params.channel : null;
   const { formats, pillars, channels } = await getReferenceData();
   const assets = await getAssets();
   const initialFormatId =
@@ -34,7 +40,18 @@ export default async function NewContentPage({ searchParams }: NewContentPagePro
       : [];
   const initialPostType =
     typeof params.postType === "string" ? (params.postType as PostType) : undefined;
-  const initialWeekIso = initialDate ? getISOWeek(initialDate) : undefined;
+  const overrideWeekIso = typeof params.week === "string" ? params.week : undefined;
+  const initialWeekIso = overrideWeekIso ?? (initialDate ? getISOWeek(initialDate) : undefined);
+  const initialContentType =
+    typeof params.contentType === "string" &&
+    CONTENT_TYPES.some((type) => type.value === params.contentType)
+      ? (params.contentType as ContentType)
+      : null;
+  const initialSubPillar =
+    typeof params.subPillar === "string" &&
+    ALL_SUB_PILLARS.some((sp) => sp.slug === params.subPillar)
+      ? params.subPillar
+      : null;
 
   return (
     <div className="space-y-6">
@@ -60,8 +77,20 @@ export default async function NewContentPage({ searchParams }: NewContentPagePro
           initialChannelIds={initialChannelIds}
           initialPostType={initialPostType}
           initialTargetPostAt={defaultTarget(initialDate)}
+          initialWeekIso={initialWeekIso}
+          initialContentType={initialContentType}
+          initialSubPillar={initialSubPillar}
         />
-        <WeeklyPlanSidebar weekIso={initialWeekIso} date={initialDate} />
+        <WeeklyPlanSidebar
+          weekIso={initialWeekIso}
+          date={initialDate}
+          basePath="/content/new"
+          pendingDraft={
+            pendingDraftChannelSlug
+              ? { channelSlug: pendingDraftChannelSlug, date: initialDate }
+              : null
+          }
+        />
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { CONTENT_TYPES } from "@/lib/taxonomy";
 
 type Option = { value: string; label: string };
 
@@ -11,9 +12,13 @@ type ContentFilterBarProps = {
   formatId: string;
   pillarId: string;
   channelId: string;
+  contentType: string;
+  subPillar: string;
+  weekIso: string;
   formats: Option[];
   pillars: Option[];
   channels: Option[];
+  subPillars: Option[];
 };
 
 const SORT_OPTIONS: Option[] = [
@@ -29,9 +34,13 @@ export function ContentFilterBar({
   formatId,
   pillarId,
   channelId,
+  contentType,
+  subPillar,
+  weekIso,
   formats,
   pillars,
   channels,
+  subPillars,
 }: ContentFilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -67,77 +76,115 @@ export function ContentFilterBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchValue]);
 
+  void pillarId;
+  void pillars;
+
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr_1fr_1fr_1fr]">
-      <div>
-        <label htmlFor="content-search">Search</label>
-        <input
-          id="content-search"
-          type="search"
-          placeholder="Title, format, pillar, hook, notes…"
-          value={searchValue}
-          onChange={(event) => setSearchValue(event.target.value)}
-          autoComplete="off"
-        />
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+        <div>
+          <label htmlFor="content-search">Search</label>
+          <input
+            id="content-search"
+            type="search"
+            placeholder="Title, framework, sub-pillar, hook, notes…"
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            autoComplete="off"
+          />
+        </div>
+        <div>
+          <label htmlFor="content-content-type">Content Type</label>
+          <select
+            id="content-content-type"
+            value={contentType}
+            onChange={(event) =>
+              pushParams({ contentType: event.target.value === "all" ? null : event.target.value })
+            }
+          >
+            <option value="all">All types</option>
+            {CONTENT_TYPES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="content-sub-pillar">Sub-Pillar</label>
+          <select
+            id="content-sub-pillar"
+            value={subPillar}
+            onChange={(event) =>
+              pushParams({ subPillar: event.target.value === "all" ? null : event.target.value })
+            }
+          >
+            <option value="all">All sub-pillars</option>
+            {subPillars.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="content-sort">Sort</label>
+          <select
+            id="content-sort"
+            value={sort}
+            onChange={(event) => pushParams({ sort: event.target.value === "scheduled" ? null : event.target.value })}
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-      <div>
-        <label htmlFor="content-sort">Sort</label>
-        <select
-          id="content-sort"
-          value={sort}
-          onChange={(event) => pushParams({ sort: event.target.value === "scheduled" ? null : event.target.value })}
-        >
-          {SORT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor="content-format">Format</label>
-        <select
-          id="content-format"
-          value={formatId}
-          onChange={(event) => pushParams({ format: event.target.value === "all" ? null : event.target.value })}
-        >
-          <option value="all">All formats</option>
-          {formats.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor="content-pillar">Pillar</label>
-        <select
-          id="content-pillar"
-          value={pillarId}
-          onChange={(event) => pushParams({ pillar: event.target.value === "all" ? null : event.target.value })}
-        >
-          <option value="all">All pillars</option>
-          {pillars.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor="content-channel">Channel</label>
-        <select
-          id="content-channel"
-          value={channelId}
-          onChange={(event) => pushParams({ channel: event.target.value === "all" ? null : event.target.value })}
-        >
-          <option value="all">All channels</option>
-          {channels.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr]">
+        <div>
+          <label htmlFor="content-format">Post Framework</label>
+          <select
+            id="content-format"
+            value={formatId}
+            onChange={(event) => pushParams({ format: event.target.value === "all" ? null : event.target.value })}
+          >
+            <option value="all">All frameworks</option>
+            {formats.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="content-channel">Channel</label>
+          <select
+            id="content-channel"
+            value={channelId}
+            onChange={(event) => pushParams({ channel: event.target.value === "all" ? null : event.target.value })}
+          >
+            <option value="all">All channels</option>
+            {channels.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="content-week">Week</label>
+          <input
+            id="content-week"
+            type="week"
+            value={weekIso === "all" ? "" : weekIso}
+            onChange={(event) =>
+              pushParams({ week: event.target.value ? event.target.value : null })
+            }
+          />
+        </div>
       </div>
     </div>
   );

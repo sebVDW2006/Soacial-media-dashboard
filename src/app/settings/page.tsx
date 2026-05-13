@@ -17,7 +17,7 @@ export default async function SettingsPage() {
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">Read-only settings</p>
         <h1 className="section-title mt-2">Settings</h1>
         <p className="muted mt-4 max-w-2xl">
-          Reference channels, the connected Turso host, and the reminder that password resets happen via env vars.
+          Reference channels and the connected Turso host for this dashboard.
         </p>
       </section>
 
@@ -38,11 +38,8 @@ export default async function SettingsPage() {
           <p className="text-sm font-semibold text-stone-500">Turso host</p>
           <p className="mt-1 text-lg font-bold">{host || "Not configured"}</p>
         </div>
-        <p className="muted text-sm">
-          Password changes are handled by updating `CONTENT_OS_PASSWORD` in the environment.
-        </p>
+        <p className="muted text-sm">The app is public to anyone with the deployment URL.</p>
       </section>
     </div>
   );
 }
-

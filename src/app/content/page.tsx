@@ -4,13 +4,25 @@ import { ContentFilterBar } from "@/components/ContentFilterBar";
 import { DeleteButton } from "@/components/DeleteButton";
 import { StatusPill } from "@/components/StatusPill";
 import {
+  ContentTypeBadge,
+  ContentTypeLegend,
+  StorytellingStructureBadge,
+  SubPillarBadge,
+} from "@/components/TaxonomyBadges";
+import {
   getContentItems,
   getContentStatusCounts,
   getReferenceData,
   type ContentSortKey,
   type ContentStatusGroup,
 } from "@/lib/queries";
-import type { Brand, ContentListItem, ContentStatus } from "@/lib/types";
+import type { Brand, ContentListItem, ContentStatus, ContentType } from "@/lib/types";
+import {
+  ALL_SUB_PILLARS,
+  CONTENT_TYPES,
+  getFormatLabel,
+  getSubPillarsForBrand,
+} from "@/lib/taxonomy";
 import { getCurrentWeek, weekRange } from "@/lib/week";
 
 type ContentPiecesPageProps = {
@@ -23,38 +35,15 @@ const STATUS_GROUPS: { key: ContentStatusGroup; label: string }[] = [
   { key: "ready", label: "Ready" },
   { key: "scheduled", label: "Scheduled" },
   { key: "posted", label: "Posted" },
+  { key: "repurpose", label: "Repurpose" },
   { key: "archived", label: "Archived" },
 ];
 
-const STATUS_SECTION_ORDER: { key: Exclude<ContentStatusGroup, "all" | "archived">; label: string }[] = [
-  { key: "draft", label: "Draft" },
-  { key: "ready", label: "Ready" },
-  { key: "scheduled", label: "Scheduled" },
-  { key: "posted", label: "Posted" },
-];
-
-const SORT_LABELS: Record<ContentSortKey, string> = {
-  scheduled: "Nearest scheduled",
-  created: "Newest created",
-  posted: "Recently posted",
-  edited: "Last edited",
-};
-
-const POST_TYPE_LABELS: Record<string, string> = {
-  "single-image": "Single image",
-  carousel: "Carousel",
-  reel: "Reel",
-  story: "Story",
-  "short-video": "Short video",
-  "text-post": "Text post",
-  "long-video": "Long video",
-  document: "Document",
-};
-
-function classifyStatus(status: ContentStatus): Exclude<ContentStatusGroup, "all" | "archived"> {
+function classifyStatus(status: ContentStatus | string): Exclude<ContentStatusGroup, "all" | "archived"> {
   if (status === "idea" || status === "drafting") return "draft";
-  if (status === "captured") return "ready";
+  if (status === "ready" || status === "captured") return "ready";
   if (status === "scheduled") return "scheduled";
+  if (status === "repurpose") return "repurpose";
   return "posted";
 }
 
@@ -82,6 +71,21 @@ function parseStatusGroup(value: string | string[] | undefined): ContentStatusGr
   if (typeof value !== "string") return "all";
   const match = STATUS_GROUPS.find((option) => option.key === value);
   return match ? match.key : "all";
+}
+
+function parseContentType(value: string | string[] | undefined): ContentType | "all" {
+  if (typeof value !== "string") return "all";
+  return CONTENT_TYPES.some((type) => type.value === value) ? (value as ContentType) : "all";
+}
+
+function parseSubPillar(value: string | string[] | undefined): string | null {
+  if (typeof value !== "string" || !value || value === "all") return null;
+  return ALL_SUB_PILLARS.some((sp) => sp.slug === value) ? value : null;
+}
+
+function parseWeekIso(value: string | string[] | undefined): string | null {
+  if (typeof value !== "string" || !value || value === "all") return null;
+  return /^\d{4}-W\d{2}$/.test(value) ? value : null;
 }
 
 function rowWeekKey(row: ContentListItem): string {
@@ -123,8 +127,23 @@ function formatTargetDate(value: string | null) {
   });
 }
 
+function formatRelativeDate(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
 function brandLabel(brand: Brand) {
   return brand === "seb" ? "Seb" : "uBlend";
+}
+
+function channelChips(channelNames: string | null) {
+  if (!channelNames) return [];
+  return channelNames
+    .split(", ")
+    .map((name) => name.trim())
+    .filter(Boolean);
 }
 
 function buildHref(baseParams: URLSearchParams, updates: Record<string, string | null>) {
@@ -139,16 +158,21 @@ function buildHref(baseParams: URLSearchParams, updates: Record<string, string |
 
 function ContentCard({ row }: { row: ContentListItem }) {
   const archived = Boolean(row.archived);
-  const postTypeLabel = row.post_type ? POST_TYPE_LABELS[row.post_type] ?? row.post_type : null;
+  const formatLabel = getFormatLabel(row.post_type);
   const target = formatTargetDate(row.target_post_at);
+  const lastEdited = formatRelativeDate(row.updated_at);
+  const channels = channelChips(row.channel_names);
 
   return (
     <div className="soft-card flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between">
       <div className="flex-1 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="chip">{brandLabel(row.brand)}</span>
+          <ContentTypeBadge contentType={row.content_type} />
+          <SubPillarBadge subPillar={row.sub_pillar} />
+          <StorytellingStructureBadge structure={row.storytelling_structure} />
           <StatusPill status={row.status} />
-          {postTypeLabel && <span className="chip">{postTypeLabel}</span>}
+          {formatLabel && <span className="chip">{formatLabel}</span>}
           {archived && <span className="chip">Archived</span>}
         </div>
         <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--brand)]">
@@ -157,11 +181,23 @@ function ContentCard({ row }: { row: ContentListItem }) {
           </Link>
         </h3>
         <p className="text-sm leading-6 text-[var(--ink-soft)]">
-          {row.format_name} • {row.pillar_name}
-          {row.channel_names ? ` • ${row.channel_names}` : ""}
+          Framework: {row.format_name}
         </p>
+        {channels.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {channels.map((channel) => (
+              <span
+                key={channel}
+                className="rounded-full border border-[var(--line)] bg-white/60 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-[var(--ink-soft)]"
+              >
+                {channel}
+              </span>
+            ))}
+          </div>
+        )}
         <p className="text-xs uppercase tracking-[0.14em] text-[var(--ink-soft)]">
-          {target ? `Target ${target}` : "No target date yet"}
+          {target ? `Scheduled ${target}` : "No scheduled date"}
+          {lastEdited ? ` · Edited ${lastEdited}` : ""}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2 lg:flex-col lg:items-end">
@@ -184,6 +220,9 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
   const formatId = parseNumber(params.format);
   const pillarId = parseNumber(params.pillar);
   const channelId = parseNumber(params.channel);
+  const contentType = parseContentType(params.contentType);
+  const subPillar = parseSubPillar(params.subPillar);
+  const weekFilter = parseWeekIso(params.week);
 
   const [{ formats, pillars, channels }, rows, counts] = await Promise.all([
     getReferenceData(),
@@ -194,9 +233,21 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
       formatId,
       pillarId,
       channelId,
+      contentType,
+      subPillar,
+      weekIso: weekFilter,
       sort,
     }),
-    getContentStatusCounts({ brand, search, formatId, pillarId, channelId }),
+    getContentStatusCounts({
+      brand,
+      search,
+      formatId,
+      pillarId,
+      channelId,
+      contentType,
+      subPillar,
+      weekIso: weekFilter,
+    }),
   ]);
 
   const currentParams = new URLSearchParams();
@@ -207,6 +258,9 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
   if (formatId) currentParams.set("format", String(formatId));
   if (pillarId) currentParams.set("pillar", String(pillarId));
   if (channelId) currentParams.set("channel", String(channelId));
+  if (contentType !== "all") currentParams.set("contentType", contentType);
+  if (subPillar) currentParams.set("subPillar", subPillar);
+  if (weekFilter) currentParams.set("week", weekFilter);
 
   const currentWeek = getCurrentWeek();
   const weekOrder: string[] = [];
@@ -227,6 +281,7 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
     return b.localeCompare(a);
   });
 
+  const subPillarsForFilter = getSubPillarsForBrand(brand === "all" ? null : brand);
   const newPieceHref = brand === "all" ? "/content/new" : `/content/new?brand=${brand}`;
   const countByGroup: Record<ContentStatusGroup, number> = {
     all: counts.all + counts.archived,
@@ -234,6 +289,7 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
     ready: counts.ready,
     scheduled: counts.scheduled,
     posted: counts.posted,
+    repurpose: counts.repurpose,
     archived: counts.archived,
   };
 
@@ -245,8 +301,11 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
             <h1 className="section-title">Content pieces</h1>
             <p className="muted mt-3 text-sm">
               {rows.length} piece{rows.length === 1 ? "" : "s"} across {weekOrder.length} week
-              {weekOrder.length === 1 ? "" : "s"} • Sorted by {SORT_LABELS[sort].toLowerCase()}
+              {weekOrder.length === 1 ? "" : "s"}
             </p>
+            <div className="mt-4">
+              <ContentTypeLegend />
+            </div>
           </div>
           <Link href={newPieceHref} className="primary-button">
             + New piece
@@ -281,9 +340,13 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
           formatId={formatId ? String(formatId) : "all"}
           pillarId={pillarId ? String(pillarId) : "all"}
           channelId={channelId ? String(channelId) : "all"}
+          contentType={contentType}
+          subPillar={subPillar ?? "all"}
+          weekIso={weekFilter ?? "all"}
           formats={formats.map((f) => ({ value: String(f.id), label: f.name }))}
           pillars={pillars.map((p) => ({ value: String(p.id), label: p.name }))}
           channels={channels.map((c) => ({ value: String(c.id), label: c.name }))}
+          subPillars={subPillarsForFilter.map((sp) => ({ value: sp.slug, label: sp.name }))}
         />
       </section>
 
@@ -301,27 +364,19 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
           const { title, subtitle } = formatWeekLabel(weekKey);
           const isCurrent = weekKey === currentWeek;
 
-          const grouped: Partial<
-            Record<Exclude<ContentStatusGroup, "all" | "archived">, ContentListItem[]>
-          > = {};
+          // Group by brand within the week
+          const byBrand: Record<"seb" | "ublend", ContentListItem[]> = {
+            seb: [],
+            ublend: [],
+          };
           const archivedItems: ContentListItem[] = [];
-
           for (const item of items) {
             if (item.archived) {
               archivedItems.push(item);
               continue;
             }
-            const section = classifyStatus(item.status);
-            const bucket = grouped[section] ?? [];
-            bucket.push(item);
-            grouped[section] = bucket;
+            byBrand[item.brand].push(item);
           }
-
-          const renderedStatusSections =
-            statusGroup === "archived"
-              ? []
-              : STATUS_SECTION_ORDER.filter(({ key }) => (grouped[key]?.length ?? 0) > 0);
-
           const showArchivedSection =
             statusGroup === "archived" || (statusGroup === "all" && archivedItems.length > 0);
 
@@ -340,22 +395,32 @@ export default async function ContentPiecesPage({ searchParams }: ContentPiecesP
                 </p>
               </header>
 
-              {renderedStatusSections.map(({ key, label }) => {
-                const sectionItems = grouped[key] ?? [];
+              {(["seb", "ublend"] as const).map((brandKey) => {
+                const brandItems = byBrand[brandKey];
+                if (brandItems.length === 0) return null;
                 return (
-                  <div key={key} className="space-y-3">
+                  <div key={brandKey} className="space-y-3">
                     <div className="flex items-center gap-3">
-                      <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-                        {label}
+                      <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--brand)]">
+                        {brandLabel(brandKey)}
                       </h3>
                       <span className="text-xs text-[var(--ink-soft)]">
-                        {sectionItems.length}
+                        {brandItems.length} piece{brandItems.length === 1 ? "" : "s"}
                       </span>
                     </div>
                     <div className="grid gap-3">
-                      {sectionItems.map((row) => (
-                        <ContentCard key={row.id} row={row} />
-                      ))}
+                      {brandItems
+                        .sort((a, b) => {
+                          // Sort by status order, then by date
+                          const order = ["idea", "drafting", "ready", "scheduled", "posted", "repurpose"];
+                          const aIndex = order.indexOf(classifyStatus(a.status));
+                          const bIndex = order.indexOf(classifyStatus(b.status));
+                          if (aIndex !== bIndex) return aIndex - bIndex;
+                          return (a.target_post_at ?? "").localeCompare(b.target_post_at ?? "");
+                        })
+                        .map((row) => (
+                          <ContentCard key={row.id} row={row} />
+                        ))}
                     </div>
                   </div>
                 );

@@ -8,19 +8,23 @@ import { getISOWeek } from "@/lib/week";
 
 type ContentDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 const statusLabels: Record<string, string> = {
   idea: "Idea",
   drafting: "Drafting",
-  captured: "Captured",
+  ready: "Ready",
+  captured: "Ready",
   scheduled: "Scheduled",
   posted: "Posted",
-  tracked: "Tracked",
+  repurpose: "Repurpose",
+  tracked: "Posted",
 };
 
-export default async function ContentDetailPage({ params }: ContentDetailPageProps) {
+export default async function ContentDetailPage({ params, searchParams }: ContentDetailPageProps) {
   const { id } = await params;
+  const sp = (await searchParams) ?? {};
   const contentId = Number(id);
 
   if (!Number.isFinite(contentId)) notFound();
@@ -30,7 +34,9 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
 
   const { formats, pillars, channels } = await getReferenceData();
   const assets = await getAssets();
-  const sidebarWeek = detail.item.week_iso ?? (detail.item.target_post_at ? getISOWeek(detail.item.target_post_at) : undefined);
+  const overrideWeek = typeof sp.week === "string" ? sp.week : undefined;
+  const itemWeek = detail.item.week_iso ?? (detail.item.target_post_at ? getISOWeek(detail.item.target_post_at) : undefined);
+  const sidebarWeek = overrideWeek ?? itemWeek;
 
   return (
     <div className="space-y-6">
@@ -52,6 +58,9 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
           action={upsertContent}
           item={detail.item}
           linkedChannelIds={detail.channels.map((channel) => channel.channel_id)}
+          linkedChannelSchedules={Object.fromEntries(
+            detail.channels.map((channel) => [channel.channel_id, channel.scheduled_at]),
+          )}
           linkedAssetIds={detail.assets.map((asset) => asset.id)}
           formats={formats}
           pillars={pillars}

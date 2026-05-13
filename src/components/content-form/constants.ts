@@ -1,4 +1,5 @@
 import type { Brand, Channel, Format, PostType } from "@/lib/types";
+import { FORMAT_OPTIONS } from "@/lib/taxonomy";
 
 export const PILLAR_BRAND_SLUGS: Record<Brand, readonly string[]> = {
   seb: ["startup-journey", "discipline-lifestyle", "faith-integrity"],
@@ -16,16 +17,10 @@ const DEFAULT_CHANNEL_SLUGS: Record<string, readonly string[]> = {
   "founder-reflection": ["seb_linkedin", "seb_instagram"],
 };
 
-export const POST_TYPE_OPTIONS = [
-  { value: "single-image", label: "Single Image" },
-  { value: "carousel", label: "Carousel" },
-  { value: "reel", label: "Reel" },
-  { value: "story", label: "Story" },
-  { value: "short-video", label: "Short Video" },
-  { value: "text-post", label: "Text Post" },
-  { value: "long-video", label: "Long Video" },
-  { value: "document", label: "Document / PDF" },
-] satisfies Array<{ value: PostType; label: string }>;
+export const POST_TYPE_OPTIONS = FORMAT_OPTIONS as ReadonlyArray<{
+  value: PostType;
+  label: string;
+}>;
 
 export function formatChannelDefaults(format: Format | undefined, channels: Channel[]) {
   if (!format) return [];

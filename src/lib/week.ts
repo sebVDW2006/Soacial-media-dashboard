@@ -74,6 +74,13 @@ export function getCurrentWeek() {
   return getISOWeek(new Date());
 }
 
+export function shiftWeek(isoWeek: string, offset: number) {
+  const range = weekRange(isoWeek);
+  const monday = new Date(`${range.start}T00:00:00Z`);
+  monday.setUTCDate(monday.getUTCDate() + offset * 7);
+  return getISOWeek(monday);
+}
+
 export function getWeekTuesday(isoWeek: string) {
   const range = weekRange(isoWeek);
   return range.days[1]?.date ?? range.start;

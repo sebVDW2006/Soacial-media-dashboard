@@ -1,9 +1,25 @@
-import type { Brand, Channel, ContentItem, Format, Pillar, PostType } from "@/lib/types";
+import type {
+  Brand,
+  Channel,
+  ContentItem,
+  ContentStatus,
+  ContentType,
+  Format,
+  Pillar,
+  PostType,
+  StorytellingStructure,
+} from "@/lib/types";
 import {
   PILLAR_BRAND_SLUGS,
   POST_TYPE_OPTIONS,
   formatChannelDefaults,
 } from "@/components/content-form/constants";
+import {
+  CONTENT_TYPES,
+  STORYTELLING_STRUCTURES,
+  getSubPillarsForBrand,
+  normalizeLegacyFormat,
+} from "@/lib/taxonomy";
 
 const NEW_DRAFT_STORAGE_KEY = "content-os:content-draft:new";
 const POST_TYPE_VALUES = new Set<PostType>(POST_TYPE_OPTIONS.map((option) => option.value));
@@ -14,6 +30,10 @@ export type DraftFields = {
   postType: PostType;
   brand: Brand;
   pillarId: number;
+  contentType: ContentType | null;
+  subPillar: string | null;
+  storytellingStructure: StorytellingStructure | null;
+  status: ContentStatus;
   targetPostAt: string;
   selectedChannels: number[];
   channelSchedules: Record<number, string>;
@@ -37,7 +57,48 @@ type BuildInitialDraftArgs = {
   initialChannelIds?: number[];
   initialPostType?: PostType;
   initialTargetPostAt?: string | null;
+  initialContentType?: ContentType | null;
+  initialSubPillar?: string | null;
+  initialStorytellingStructure?: StorytellingStructure | null;
 };
+
+const CONTENT_TYPE_VALUES = new Set<ContentType>(
+  CONTENT_TYPES.map((type) => type.value),
+);
+const STORYTELLING_STRUCTURE_VALUES = new Set<StorytellingStructure>(
+  STORYTELLING_STRUCTURES.map((s) => s.slug),
+);
+
+function isStorytellingStructure(value: unknown): value is StorytellingStructure {
+  return (
+    typeof value === "string" &&
+    STORYTELLING_STRUCTURE_VALUES.has(value as StorytellingStructure)
+  );
+}
+const STATUS_VALUES = new Set<ContentStatus>([
+  "idea",
+  "drafting",
+  "ready",
+  "scheduled",
+  "posted",
+  "repurpose",
+]);
+
+function isContentType(value: unknown): value is ContentType {
+  return typeof value === "string" && CONTENT_TYPE_VALUES.has(value as ContentType);
+}
+
+function isStatus(value: unknown): value is ContentStatus {
+  return typeof value === "string" && STATUS_VALUES.has(value as ContentStatus);
+}
+
+function legacyStatusToContentStatus(value: string | null | undefined): ContentStatus {
+  if (!value) return "drafting";
+  if (value === "captured") return "ready";
+  if (value === "tracked") return "posted";
+  if (STATUS_VALUES.has(value as ContentStatus)) return value as ContentStatus;
+  return "drafting";
+}
 
 function isBrand(value: unknown): value is Brand {
   return value === "seb" || value === "ublend";
@@ -117,6 +178,23 @@ function buildInitialChannelSchedules(
   return schedules;
 }
 
+function fillMissingChannelSchedules(
+  selectedChannelIds: number[],
+  channelSchedules: Record<number, string>,
+  fallbackChannelSchedules: Record<number, string>,
+  fallbackTargetPostAt: string,
+) {
+  const schedules = { ...channelSchedules };
+
+  for (const channelId of selectedChannelIds) {
+    if (!schedules[channelId]) {
+      schedules[channelId] = fallbackChannelSchedules[channelId] ?? fallbackTargetPostAt;
+    }
+  }
+
+  return schedules;
+}
+
 export function buildInitialDraft(
   args: BuildInitialDraftArgs,
   formats: Format[],
@@ -134,13 +212,37 @@ export function buildInitialDraft(
     formats,
   );
   const targetPostAt = args.initialTargetPostAt ?? args.item?.target_post_at?.slice(0, 16) ?? "";
+  const initialPostType = normalizeLegacyFormat(
+    args.item?.post_type ?? args.initialPostType ?? "linkedin-text-post",
+  ) as PostType;
+  const initialContentType = args.item?.content_type ?? args.initialContentType ?? null;
+  const subPillarsForBrand = getSubPillarsForBrand(initialBrand);
+  const fallbackSubPillar =
+    args.item?.sub_pillar ??
+    args.initialSubPillar ??
+    null;
+  const subPillarValid = fallbackSubPillar
+    ? subPillarsForBrand.some((sp) => sp.slug === fallbackSubPillar)
+    : false;
+
+  const fallbackStorytelling =
+    args.item?.storytelling_structure ?? args.initialStorytellingStructure ?? null;
+  const initialStorytelling: StorytellingStructure | null = isStorytellingStructure(
+    fallbackStorytelling,
+  )
+    ? fallbackStorytelling
+    : null;
 
   return {
     title: args.item?.title ?? "",
     formatId: activeFormatId,
-    postType: args.item?.post_type ?? args.initialPostType ?? "single-image",
+    postType: initialPostType,
     brand: initialBrand,
     pillarId: getValidPillarId(initialPillarId, pillars, initialBrand),
+    contentType: initialContentType,
+    subPillar: subPillarValid ? fallbackSubPillar : null,
+    storytellingStructure: initialStorytelling,
+    status: legacyStatusToContentStatus(args.item?.status ?? null),
     targetPostAt,
     selectedChannels,
     channelSchedules: buildInitialChannelSchedules(
@@ -255,6 +357,11 @@ export function readStoredDraft({
           }, {})
         : fallback.channelSchedules;
 
+    const validSubPillars = new Set(getSubPillarsForBrand(brand).map((sp) => sp.slug));
+    const storedSubPillar =
+      typeof parsed.subPillar === "string" && validSubPillars.has(parsed.subPillar)
+        ? parsed.subPillar
+        : fallback.subPillar;
     return {
       title: typeof parsed.title === "string" ? parsed.title : fallback.title,
       formatId:
@@ -267,10 +374,21 @@ export function readStoredDraft({
         typeof parsed.pillarId === "number" && validPillarIds.has(parsed.pillarId)
           ? parsed.pillarId
           : fallback.pillarId,
+      contentType: isContentType(parsed.contentType) ? parsed.contentType : fallback.contentType,
+      subPillar: storedSubPillar,
+      storytellingStructure: isStorytellingStructure(parsed.storytellingStructure)
+        ? parsed.storytellingStructure
+        : fallback.storytellingStructure,
+      status: isStatus(parsed.status) ? parsed.status : fallback.status,
       targetPostAt:
         typeof parsed.targetPostAt === "string" ? parsed.targetPostAt : fallback.targetPostAt,
       selectedChannels,
-      channelSchedules,
+      channelSchedules: fillMissingChannelSchedules(
+        selectedChannels,
+        channelSchedules,
+        fallback.channelSchedules,
+        fallback.targetPostAt,
+      ),
       hook: typeof parsed.hook === "string" ? parsed.hook : fallback.hook,
       body: typeof parsed.body === "string" ? parsed.body : fallback.body,
       close: typeof parsed.close === "string" ? parsed.close : fallback.close,
