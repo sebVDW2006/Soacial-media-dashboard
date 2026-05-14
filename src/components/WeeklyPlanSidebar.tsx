@@ -239,12 +239,45 @@ export async function WeeklyPlanSidebar({
             ? `In ${offsetWeeks} weeks`
             : `${Math.abs(offsetWeeks)} weeks ago`;
 
-  // Build a map: channel_slug -> list of content items
-  const byChannel = new Map<string, typeof items>();
-  for (const item of items) {
-    const existing = byChannel.get(item.channel_slug) ?? [];
-    existing.push(item);
-    byChannel.set(item.channel_slug, existing);
+  // De-dup items returned by LEFT JOIN (one row per attached channel, or one row with null)
+  const dedupedItems = new Map<number, (typeof items)[number] & { channelSlugs: string[] }>();
+  for (const row of items) {
+    const existing = dedupedItems.get(row.id);
+    if (existing) {
+      if (row.channel_slug) existing.channelSlugs.push(row.channel_slug);
+    } else {
+      dedupedItems.set(row.id, {
+        ...row,
+        channelSlugs: row.channel_slug ? [row.channel_slug] : [],
+      });
+    }
+  }
+
+  const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const dayDates = new Map<string, string>(dayOrder.map((d, i) => [d, range.days[i]?.date ?? ""]));
+
+  const matchesSlot = (
+    item: (typeof items)[number] & { channelSlugs: string[] },
+    slot: Slot,
+  ) => {
+    if (item.channelSlugs.includes(slot.channelSlug)) return true;
+    if (item.channelSlugs.length === 0) {
+      // Fuzzy fallback for pieces with no attached channel: match the slot by
+      // brand + scheduled day-of-week. Slot post_type is just a default
+      // suggestion, not a hard filter — the user expects pieces to show up on
+      // the day they scheduled them regardless of format.
+      if (item.brand !== slot.brand) return false;
+      const itemDate = item.target_post_at?.slice(0, 10);
+      if (!itemDate) return false;
+      return itemDate === dayDates.get(slot.day);
+    }
+    return false;
+  };
+
+  const itemsBySlot = new Map<string, Array<(typeof items)[number] & { channelSlugs: string[] }>>();
+  for (const slot of WEEKLY_SLOTS) {
+    const matched = [...dedupedItems.values()].filter((item) => matchesSlot(item, slot));
+    if (matched.length) itemsBySlot.set(slot.channelSlug, matched);
   }
 
   const isPendingSlot = (slot: Slot, slotDate: string) =>
@@ -252,9 +285,8 @@ export async function WeeklyPlanSidebar({
     (!pendingDraft.date || pendingDraft.date === slotDate);
 
   const done = WEEKLY_SLOTS.filter((slot) => {
-    const dayIndex = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(slot.day);
-    const slotDate = range.days[dayIndex]?.date ?? "";
-    return byChannel.has(slot.channelSlug) || isPendingSlot(slot, slotDate);
+    const slotDate = dayDates.get(slot.day) ?? "";
+    return itemsBySlot.has(slot.channelSlug) || isPendingSlot(slot, slotDate);
   }).length;
 
   const sebWarning = balanceWarning(balance.seb, "seb");
@@ -370,9 +402,8 @@ export async function WeeklyPlanSidebar({
       {/* Slots */}
       <div className="space-y-2">
         {WEEKLY_SLOTS.map((slot) => {
-          const slotItems = byChannel.get(slot.channelSlug) ?? [];
-          const dayIndex = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(slot.day);
-          const slotDate = range.days[dayIndex]?.date ?? "";
+          const slotItems = itemsBySlot.get(slot.channelSlug) ?? [];
+          const slotDate = dayDates.get(slot.day) ?? "";
           const hasSavedContent = slotItems.length > 0;
           const draftInProgress = !hasSavedContent && isPendingSlot(slot, slotDate);
           const isDone = hasSavedContent || draftInProgress;

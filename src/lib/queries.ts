@@ -725,10 +725,13 @@ export async function getWeeklySlotContent(weekIso: string) {
         ci.id,
         ci.title,
         ci.status,
+        ci.brand,
+        ci.post_type,
+        ci.target_post_at,
         ch.slug AS channel_slug
       FROM content_items ci
-      INNER JOIN content_channels cc ON cc.content_item_id = ci.id
-      INNER JOIN channels ch ON ch.id = cc.channel_id
+      LEFT JOIN content_channels cc ON cc.content_item_id = ci.id
+      LEFT JOIN channels ch ON ch.id = cc.channel_id
       WHERE (
           ci.target_post_at IS NOT NULL
           AND substr(ci.target_post_at, 1, 10) BETWEEN ? AND ?
@@ -749,7 +752,10 @@ export async function getWeeklySlotContent(weekIso: string) {
     id: number;
     title: string;
     status: string;
-    channel_slug: string;
+    brand: string;
+    post_type: string | null;
+    target_post_at: string | null;
+    channel_slug: string | null;
   }>(result);
 }
 
