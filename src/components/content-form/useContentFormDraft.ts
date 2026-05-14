@@ -278,6 +278,17 @@ export function useContentFormDraft(args: UseContentFormDraftArgs) {
     setBackupFailed(false);
   };
 
+  const clearStoredDraft = () => {
+    try {
+      window.localStorage.removeItem(draftStorageKey);
+    } catch {
+      // ignore — clearing on submit is best-effort
+    }
+    setRecoveredDraftAt(null);
+    setLastBackupAt(null);
+    setBackupFailed(false);
+  };
+
   return {
     draft,
     visiblePillars,
@@ -291,5 +302,6 @@ export function useContentFormDraft(args: UseContentFormDraftArgs) {
     toggleChannel,
     setChannelDate,
     discardRecoveredDraft,
+    clearStoredDraft,
   };
 }

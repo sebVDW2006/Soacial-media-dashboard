@@ -204,20 +204,44 @@ export async function upsertContent(formData: FormData) {
   }
 
   const db = await getDb();
-  let contentId = id ?? 0;
+  let effectiveId: number | null = id;
+
+  // Dedup guard: if this is an "insert" (no id), check whether the exact same
+  // post was just saved a few seconds ago — same title + brand, no archived flag,
+  // created within the last 60 seconds. If so, treat this submit as an UPDATE on
+  // that row instead of inserting a duplicate. This catches:
+  //   1. Double-clicks on Save that fired two POSTs before the redirect.
+  //   2. A browser back/refresh that re-submitted the form.
+  //   3. Re-hydration of an auto-saved localStorage draft on a fresh /new page.
+  if (!effectiveId) {
+    const recent = await db.execute({
+      sql: `SELECT id FROM content_items
+        WHERE title = ? AND brand = ? AND archived = 0
+          AND datetime(COALESCE(updated_at, created_at)) >= datetime('now', '-60 seconds')
+        ORDER BY id DESC
+        LIMIT 1`,
+      args: [title, brand],
+    });
+    const recentId = Number(recent.rows[0]?.id ?? 0);
+    if (recentId) {
+      effectiveId = recentId;
+    }
+  }
+
+  let contentId = effectiveId ?? 0;
   let existingWeekIso: string | null = null;
 
-  if (id) {
+  if (effectiveId) {
     const existing = await db.execute({
       sql: "SELECT week_iso FROM content_items WHERE id = ?",
-      args: [id],
+      args: [effectiveId],
     });
     existingWeekIso = (existing.rows[0]?.week_iso as string | null) ?? null;
   }
 
   const weekIso = targetPostAt ? getISOWeek(targetPostAt) : existingWeekIso ?? getCurrentWeek();
 
-  if (id) {
+  if (effectiveId) {
     await db.execute({
       sql: `UPDATE content_items
         SET title = ?, format_id = ?, pillar_id = ?, brand = ?, content_type = ?, sub_pillar = ?,
@@ -233,7 +257,7 @@ export async function upsertContent(formData: FormData) {
         postType, hook, body, close,
         targetPostAt, weekIso, notes,
         status,
-        id,
+        effectiveId,
       ],
     });
   } else {

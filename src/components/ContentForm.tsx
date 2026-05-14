@@ -71,6 +71,7 @@ export function ContentForm({
     toggleChannel,
     setChannelDate,
     discardRecoveredDraft,
+    clearStoredDraft,
   } = useContentFormDraft({
     item,
     linkedChannelIds,
@@ -93,7 +94,7 @@ export function ContentForm({
   void assets;
 
   return (
-    <form action={action} className="space-y-6">
+    <form action={action} onSubmit={clearStoredDraft} className="space-y-6">
       {item?.id ? <input type="hidden" name="id" value={item.id} /> : null}
       {initialWeekIso ? <input type="hidden" name="week_iso" value={initialWeekIso} /> : null}
       <input type="hidden" name="status" value={draft.status} />

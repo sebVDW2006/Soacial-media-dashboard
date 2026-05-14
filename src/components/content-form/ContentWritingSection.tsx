@@ -1,3 +1,5 @@
+import { SubmitButton } from "@/components/content-form/SubmitButton";
+
 type ContentWritingSectionProps = {
   hook: string;
   body: string;
@@ -86,9 +88,7 @@ export function ContentWritingSection({
           </button>
         ) : null}
       </div>
-      <button type="submit" className="primary-button">
-        Save content
-      </button>
+      <SubmitButton label="Save content" pendingLabel="Saving…" />
     </section>
   );
 }
