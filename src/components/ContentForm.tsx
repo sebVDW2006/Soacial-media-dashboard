@@ -162,18 +162,20 @@ export function ContentForm({
         </section>
       ) : null}
 
-      <SmartTemplatePanel
-        contentType={draft.contentType}
-        storytellingStructure={draft.storytellingStructure}
-        hookEmpty={!draft.hook.trim()}
-        bodyEmpty={!draft.body.trim()}
-        closeEmpty={!draft.close.trim()}
-        onApply={(next) => {
-          if (next.hook && !draft.hook.trim()) setField("hook", next.hook);
-          if (next.body && !draft.body.trim()) setField("body", next.body);
-          if (next.close && !draft.close.trim()) setField("close", next.close);
-        }}
-      />
+      {draft.storytellingStructure ? null : (
+        <SmartTemplatePanel
+          contentType={draft.contentType}
+          storytellingStructure={draft.storytellingStructure}
+          hookEmpty={!draft.hook.trim()}
+          bodyEmpty={!draft.body.trim()}
+          closeEmpty={!draft.close.trim()}
+          onApply={(next) => {
+            if (next.hook && !draft.hook.trim()) setField("hook", next.hook);
+            if (next.body && !draft.body.trim()) setField("body", next.body);
+            if (next.close && !draft.close.trim()) setField("close", next.close);
+          }}
+        />
+      )}
 
       <ContentWritingSection
         hook={draft.hook}
