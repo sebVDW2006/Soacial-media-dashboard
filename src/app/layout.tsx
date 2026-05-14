@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { VersionWatcher } from "@/components/VersionWatcher";
 
 export const metadata: Metadata = {
   title: "Content Dashboard",
@@ -41,6 +42,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body>
+        <VersionWatcher />
         <div className="page-shell">
           <Suspense
             fallback={
